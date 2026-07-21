@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LedgerPoint POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#141A23;         /* terminal chrome */
+  --ink2:#1C2430;        /* raised panels */
+  --ink3:#252F3D;        /* hover / inputs */
+  --line:#303B4B;
+  --text:#E9EDF2;
+  --mut:#8C97A7;
+  --paper:#F8F4E9;       /* receipt paper */
+  --paper-ink:#22261F;
+  --grn:#2FA57B;         /* ledger green */
+  --grn-d:#22815F;
+  --amb:#E2A93B;
+  --red:#E06161;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Archivo',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--ink);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:inherit;color:var(--text);background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--grn);outline-offset:-1px}
+::placeholder{color:#5E6978}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:216px 1fr;height:100vh;overflow:hidden}
+.side{background:var(--ink);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px 12px}
+.brand{padding:4px 10px 18px}
+.brand h1{font-size:19px;font-weight:800;font-stretch:110%;letter-spacing:-.3px}
+.brand h1 span{color:var(--grn)}
+.brand small{color:var(--mut);font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;border-radius:9px;color:var(--mut);font-weight:600}
+.nav button svg{width:17px;height:17px;flex:none}
+.nav button:hover{background:var(--ink2);color:var(--text)}
+.nav button.on{background:var(--ink2);color:var(--text);box-shadow:inset 3px 0 0 var(--grn)}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px}
+.cashier-chip{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--ink2);border:1px solid var(--line);text-align:left}
+.cashier-chip:hover{border-color:var(--grn)}
+.cashier-chip .avatar{width:30px;height:30px;border-radius:50%;background:var(--grn);color:#0B1712;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.cashier-chip .nm{font-weight:700;font-size:13.5px;line-height:1.15}
+.cashier-chip .rl{color:var(--mut);font-size:11px;font-family:var(--mono)}
+.main{overflow:auto;background:var(--ink)}
+.view{display:none;padding:22px 26px 40px;max-width:1280px}
+.view.on{display:block}
+.vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.vhead h2{font-size:24px;font-weight:800;font-stretch:105%;letter-spacing:-.4px}
+.vhead p{color:var(--mut);font-size:13px;margin-top:3px}
+
+/* ---------- shared bits ---------- */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:9px;font-weight:700;background:var(--ink3);border:1px solid var(--line)}
+.btn:hover{border-color:var(--mut)}
+.btn.grn{background:var(--grn);border-color:var(--grn);color:#07130E}
+.btn.grn:hover{background:#37b98b}
+.btn.red{color:var(--red);border-color:#5a3434}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:7px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.badge{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:99px;letter-spacing:.4px}
+.badge.ok{background:#1c3a2f;color:#6fe0b4}
+.badge.low{background:#3f3418;color:#f2c766}
+.badge.out{background:#42272a;color:#f39a9a}
+.badge.gray{background:var(--ink3);color:var(--mut)}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:11px 14px;border-bottom:1px solid #26303e;font-size:14px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-family:var(--mono)}
+.empty{padding:44px 20px;text-align:center;color:var(--mut)}
+.empty b{display:block;color:var(--text);margin-bottom:5px;font-size:15px}
+
+/* ---------- register ---------- */
+#view-register{max-width:none;display:none;grid-template-columns:1fr 372px;gap:22px;height:calc(100vh - 0px);padding:22px 26px}
+#view-register.on{display:grid}
+.reg-left{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.scanbar{display:flex;gap:10px;margin-bottom:12px}
+.scanwrap{position:relative;flex:1}
+.scanwrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--grn)}
+#scanInput{padding-left:42px;font-family:var(--mono);font-size:15px;background:var(--ink2)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.chips button{padding:6px 13px;border-radius:99px;border:1px solid var(--line);color:var(--mut);font-weight:600;font-size:13px}
+.chips button.on{background:var(--grn);border-color:var(--grn);color:#07130E}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;overflow-y:auto;padding-bottom:10px;align-content:start;flex:1}
+.ptile{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:7px;min-height:112px;transition:transform .06s}
+.ptile:hover{border-color:var(--grn)}
+.ptile:active{transform:scale(.97)}
+.ptile.out{opacity:.45}
+.ptile .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+.ptile .nm{font-weight:700;font-size:13.5px;line-height:1.25;flex:1}
+.ptile .row{display:flex;justify-content:space-between;align-items:center}
+.ptile .pr{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--grn)}
+.ptile .st{font-family:var(--mono);font-size:10.5px;color:var(--mut)}
+.ptile .st.warn{color:var(--amb)}
+.ptile .st.zero{color:var(--red)}
+
+/* receipt — the signature */
+.reg-right{display:flex;flex-direction:column;min-height:0}
+.receipt{background:var(--paper);color:var(--paper-ink);border-radius:10px 10px 0 0;flex:1;display:flex;flex-direction:column;min-height:0;font-family:var(--mono);box-shadow:0 12px 34px rgba(0,0,0,.4)}
+.receipt-head{padding:16px 18px 10px;text-align:center;border-bottom:1px dashed #b9b39f}
+.receipt-head .store{font-weight:700;font-size:15px;letter-spacing:.5px;text-transform:uppercase}
+.receipt-head .meta{font-size:10.5px;color:#6d6a5d;margin-top:3px}
+.rlines{flex:1;overflow-y:auto;padding:8px 18px;min-height:0}
+.rline{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid #ece7d8;font-size:12.5px}
+.rline .n{font-weight:600}
+.rline .amt{font-weight:700;text-align:right}
+.rline .sub{grid-column:1/-1;display:flex;align-items:center;gap:6px;color:#6d6a5d;font-size:11px}
+.qbtn{width:22px;height:22px;border-radius:6px;background:#e8e2d1;color:#22261f;font-weight:700;display:grid;place-items:center;font-size:13px;line-height:1}
+.qbtn:hover{background:#dcd5bf}
+.qbtn.x{margin-left:auto;color:#a34d4d;background:transparent;font-size:15px}
+.rempty{padding:38px 14px;text-align:center;color:#8a8674;font-size:12px}
+.rtotals{border-top:1px dashed #b9b39f;padding:11px 18px 14px;font-size:12.5px}
+.rtotals .tr{display:flex;justify-content:space-between;padding:2.5px 0}
+.rtotals .tr.big{font-size:17px;font-weight:700;padding-top:7px;margin-top:5px;border-top:1.5px solid var(--paper-ink)}
+.rtotals .disc{color:#8a6a1c}
+.disc-btn{background:none;border:none;color:#6d6a5d;text-decoration:underline dotted;font-family:var(--mono);font-size:11px;padding:0}
+/* perforated bottom edge */
+.perf{height:12px;background:linear-gradient(45deg,transparent 33.33%,var(--paper) 33.33%,var(--paper) 66.67%,transparent 66.67%),linear-gradient(-45deg,transparent 33.33%,var(--paper) 33.33%,var(--paper) 66.67%,transparent 66.67%);background-size:14px 24px;background-position:0 -12px;flex:none}
+.charge{margin-top:12px;display:grid;grid-template-columns:1fr auto;gap:10px}
+#chargeBtn{padding:15px;border-radius:11px;font-size:16px;font-weight:800;font-family:var(--mono);letter-spacing:.5px}
+#clearCart{padding:0 16px;border-radius:11px}
+
+/* ---------- stats / reports ---------- */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.stat{padding:15px 17px}
+.stat .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+.stat .val{font-family:var(--mono);font-size:23px;font-weight:700;margin-top:5px}
+.stat .sub2{font-size:11.5px;color:var(--mut);margin-top:2px;font-family:var(--mono)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.card h3{font-size:13px;font-weight:700;padding:13px 15px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono);color:var(--mut)}
+.bar-row{display:flex;align-items:center;gap:10px;padding:8px 15px;font-size:13px}
+.bar-row .bn{width:130px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.bar-track{flex:1;height:9px;background:var(--ink3);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;background:var(--grn);border-radius:99px}
+.bar-row .bv{font-family:var(--mono);font-size:12px;width:88px;text-align:right;flex:none}
+.seg{display:inline-flex;background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+.seg button{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--mut)}
+.seg button.on{background:var(--grn);color:#07130E}
+
+/* ---------- modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(6,9,13,.72);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+.overlay.on{display:flex}
+.modal{background:var(--ink2);border:1px solid var(--line);border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto}
+.modal.wide{max-width:560px}
+.mhead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.mhead h3{font-size:16px;font-weight:800}
+.mclose{color:var(--mut);font-size:22px;line-height:1;padding:4px}
+.mbody{padding:18px 20px}
+.mfoot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--line)}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--mut);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pay-methods{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
+.pay-methods button{padding:15px 8px;border-radius:11px;background:var(--ink3);border:1.5px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:7px;font-weight:700;font-size:13px}
+.pay-methods button svg{width:22px;height:22px}
+.pay-methods button.on{border-color:var(--grn);background:#1a2e27;color:#7ce4bb}
+.quick-cash{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}
+.quick-cash button{padding:8px 4px;border-radius:8px;background:var(--ink3);border:1px solid var(--line);font-family:var(--mono);font-size:13px;font-weight:600}
+.quick-cash button:hover{border-color:var(--grn)}
+.due-line{display:flex;justify-content:space-between;font-family:var(--mono);padding:9px 0;font-size:14px}
+.due-line.big{font-size:21px;font-weight:700;border-top:1px solid var(--line);padding-top:12px;margin-top:5px}
+.due-line .ch{color:var(--grn)}
+.proc{text-align:center;padding:28px 10px}
+.proc .spin{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--grn);border-radius:50%;margin:0 auto 16px;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.proc .stat-msg{font-family:var(--mono);font-size:13px;color:var(--mut)}
+.approved{width:52px;height:52px;border-radius:50%;background:var(--grn);color:#07130E;display:grid;place-items:center;margin:0 auto 14px;font-size:26px;font-weight:800}
+
+/* receipt modal (final) */
+.final-receipt{background:var(--paper);color:var(--paper-ink);font-family:var(--mono);font-size:12px;padding:20px 22px;border-radius:8px;line-height:1.55;max-height:52vh;overflow-y:auto}
+.final-receipt .c{text-align:center}
+.final-receipt hr{border:none;border-top:1px dashed #b9b39f;margin:9px 0}
+.final-receipt .fr-line{display:flex;justify-content:space-between;gap:8px}
+.final-receipt .tot{font-size:15px;font-weight:700}
+
+/* toast */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink2);border:1px solid var(--line);border-left:3px solid var(--grn);padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;z-index:99;transition:transform .25s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#toast.on{transform:translateX(-50%) translateY(0)}
+#toast.err{border-left-color:var(--red)}
+
+/* cashier picker */
+.staff-pick{display:flex;flex-direction:column;gap:8px}
+.staff-pick button{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:var(--ink3);border:1.5px solid var(--line);text-align:left;font-weight:700}
+.staff-pick button:hover{border-color:var(--grn)}
+.staff-pick .avatar{width:34px;height:34px;border-radius:50%;background:var(--grn);color:#07130E;display:grid;place-items:center;font-weight:800}
+
+/* print */
+#printArea{display:none}
+@media print{
+  body>.app,#toast,.overlay{display:none!important}
+  #printArea{display:block!important;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#000;width:280px;margin:0 auto;line-height:1.5}
+  #printArea .c{text-align:center}
+  #printArea hr{border:none;border-top:1px dashed #000;margin:8px 0}
+  #printArea .fr-line{display:flex;justify-content:space-between;gap:8px}
+  #printArea .tot{font-size:13px;font-weight:700}
+}
+
+@media(max-width:980px){
+  .app{grid-template-columns:64px 1fr}
+  .brand h1,.brand small,.nav button span,.cashier-chip .txt{display:none}
+  .nav button{justify-content:center;padding:12px}
+  .cashier-chip{justify-content:center;padding:8px}
+  #view-register{grid-template-columns:1fr;height:auto}
+  .reg-right{height:460px}
+  .two-col{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+    <div class="brand">
+      <h1>Ledger<span>Point</span></h1>
+      <small>Point of Sale</small>
+    </div>
+    <nav class="nav">
+      <button data-nav="register" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6a2 2 0 012-2h6a2 2 0 012 2v2M7 13h4"/></svg><span>Register</span></button>
+      <button data-nav="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3.3 8.5L12 13l8.7-4.5M12 13v8.5"/></svg><span>Inventory</span></button>
+      <button data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span>Sales log</span></button>
+      <button data-nav="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Reports</span></button>
+      <button data-nav="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 010 6.4M18 14.7c2 .8 3.2 2.6 3.7 5.3"/></svg><span>Staff</span></button>
+      <button data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4.1 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4.1h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114.1 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.2a2 2 0 110 4.1h-.2a1.7 1.7 0 00-1.5 1z"/></svg><span>Settings</span></button>
+    </nav>
+    <div class="side-foot">
+      <button class="cashier-chip" id="cashierChip" title="Switch cashier">
+        <span class="avatar" id="cashAvatar">?</span>
+        <span class="txt"><span class="nm" id="cashName">No cashier</span><br><span class="rl">on register</span></span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- REGISTER -->
+    <section class="view on" id="view-register">
+      <div class="reg-left">
+        <div class="scanbar">
+          <div class="scanwrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v14M7 5v14M10 5v14M14 5v14M17 5v14M21 5v14" stroke-width="1.6"/></svg>
+            <input id="scanInput" placeholder="Scan barcode or type SKU, then Enter" autocomplete="off">
+          </div>
+          <input id="prodSearch" placeholder="Search products…" style="max-width:210px" autocomplete="off">
+        </div>
+        <div class="chips" id="catChips"></div>
+        <div class="pgrid" id="prodGrid"></div>
+      </div>
+
+      <div class="reg-right">
+        <div class="receipt">
+          <div class="receipt-head">
+            <div class="store" id="rcptStore">Store</div>
+            <div class="meta" id="rcptMeta"></div>
+          </div>
+          <div class="rlines" id="cartLines"><div class="rempty">Register is clear.<br>Scan an item or tap a product to begin.</div></div>
+          <div class="rtotals">
+            <div class="tr"><span>Subtotal</span><span id="tSub">—</span></div>
+            <div class="tr disc" id="discRow" style="display:none"><span id="discLbl">Discount</span><span id="tDisc"></span></div>
+            <div class="tr"><span id="taxLbl">Tax</span><span id="tTax">—</span></div>
+            <div class="tr big"><span>TOTAL</span><span id="tTotal">—</span></div>
+            <div style="text-align:right;margin-top:6px"><button class="disc-btn" id="discBtn">+ add discount</button></div>
+          </div>
+        </div>
+        <div class="perf"></div>
+        <div class="charge">
+          <button class="btn grn" id="chargeBtn" disabled>CHARGE</button>
+          <button class="btn" id="clearCart" title="Void sale">Void</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section class="view" id="view-inventory">
+      <div class="vhead">
+        <div><h2>Inventory</h2><p>Product library, stock levels and low-stock alerts. Stock updates automatically with every sale.</p></div>
+        <div style="display:flex;gap:9px">
+          <input id="invSearch" placeholder="Search name, SKU, category…" style="width:230px" autocomplete="off">
+          <button class="btn grn" id="addProdBtn">+ Add product</button>
+        </div>
+      </div>
+      <div class="stat-row" id="invStats"></div>
+      <div class="card"><table>
+        <thead><tr><th>Product</th><th>SKU / Barcode</th><th>Category</th><th class="num">Price</th><th class="num">Cost</th><th class="num">In stock</th><th>Status</th><th></th></tr></thead>
+        <tbody id="invBody"></tbody>
+      </table></div>
+    </section>
+
+    <!-- SALES LOG -->
+    <section class="view" id="view-sales">
+      <div class="vhead">
+        <div><h2>Sales log</h2><p>Every completed transaction — who rang it up, how it was paid, and a reprintable receipt.</p></div>
+        <button class="btn" id="exportCsv">Export CSV</button>
+      </div>
+      <div class="card"><table>
+        <thead><tr><th>Receipt #</th><th>Date &amp; time</th><th>Cashier</th><th class="num">Items</th><th>Payment</th><th class="num">Total</th><th></th></tr></thead>
+        <tbody id="salesBody"></tbody>
+      </table></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="view" id="view-reports">
+      <div class="vhead">
+        <div><h2>Reports</h2><p>Sales performance, top items, staff and payment mix.</p></div>
+        <div class="seg" id="repRange">
+          <button data-r="today" class="on">Today</button>
+          <button data-r="7">7 days</button>
+          <button data-r="30">30 days</button>
+          <button data-r="all">All time</button>
+        </div>
+      </div>
+      <div class="stat-row" id="repStats"></div>
+      <div class="two-col">
+        <div class="card"><h3>Top sellers</h3><div id="topItems"></div></div>
+        <div class="card"><h3>Sales by staff</h3><div id="byStaff"></div></div>
+      </div>
+      <div class="two-col">
+        <div class="card"><h3>Payment methods</h3><div id="byMethod"></div></div>
+        <div class="card"><h3>Sales by category</h3><div id="byCat"></div></div>
+      </div>
+    </section>
+
+    <!-- STAFF -->
+    <section class="view" id="view-staff">
+      <div class="vhead">
+        <div><h2>Staff</h2><p>Every sale is logged against the cashier signed in on the register.</p></div>
+        <button class="btn grn" id="addStaffBtn">+ Add staff member</button>
+      </div>
+      <div class="card"><table>
+        <thead><tr><th>Name</th><th>Role</th><th class="num">Sales rung</th><th class="num">Revenue</th><th>Status</th><th></th></tr></thead>
+        <tbody id="staffBody"></tbody>
+      </table></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-settings">
+      <div class="vhead"><div><h2>Settings</h2><p>Store identity, tax and receipts. Changes apply immediately.</p></div></div>
+      <div class="card" style="max-width:520px;padding:20px">
+        <div class="field"><label>Store name</label><input id="setStore"></div>
+        <div class="frow">
+          <div class="field"><label>Currency symbol</label><input id="setCur" maxlength="4"></div>
+          <div class="field"><label>Tax rate (%)</label><input id="setTax" type="number" min="0" max="60" step="0.5"></div>
+        </div>
+        <div class="field"><label>Receipt footer message</label><input id="setFoot"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <button class="btn red sm" id="resetData">Reset all data</button>
+          <button class="btn grn" id="saveSettings">Save settings</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="overlay" id="ovl">
+  <div class="modal" id="modalBox"></div>
+</div>
+<div id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+/* =====================================================================
+   LedgerPoint POS — single-file point of sale
+   State is persisted with window.storage when available (survives
+   sessions in Claude artifacts); otherwise it runs fully in memory.
+===================================================================== */
+(function(){
+"use strict";
+
+/* ---------------- state ---------------- */
+const DEFAULTS = {
+  settings:{ store:"Hazard Corner Store", currency:"J$", taxRate:15, footer:"Thank you — walk good!" },
+  seq:1001,
+  employees:[
+    {id:"e1", name:"Rush", role:"Manager", active:true},
+    {id:"e2", name:"Keisha", role:"Cashier", active:true}
+  ],
+  products:[
+    {id:"p1", name:"Bottled Water 500ml", sku:"1001", cat:"Drinks", price:120, cost:60, stock:48, low:12},
+    {id:"p2", name:"Box Juice — Fruit Punch", sku:"1002", cat:"Drinks", price:180, cost:95, stock:30, low:10},
+    {id:"p3", name:"Banana Chips 100g", sku:"2001", cat:"Snacks", price:250, cost:140, stock:24, low:8},
+    {id:"p4", name:"Cheese Crunchies", sku:"2002", cat:"Snacks", price:150, cost:80, stock:40, low:10},
+    {id:"p5", name:"Spice Bun (small)", sku:"3001", cat:"Bakery", price:300, cost:170, stock:15, low:5},
+    {id:"p6", name:"Hard Dough Bread", sku:"3002", cat:"Bakery", price:450, cost:280, stock:10, low:4},
+    {id:"p7", name:"Tin Mackerel", sku:"4001", cat:"Grocery", price:390, cost:240, stock:20, low:6},
+    {id:"p8", name:"Rice 1kg", sku:"4002", cat:"Grocery", price:520, cost:330, stock:18, low:6},
+    {id:"p9", name:"Phone Credit Voucher", sku:"5001", cat:"Services", price:500, cost:470, stock:50, low:10}
+  ],
+  sales:[]
+};
+let db = null;                       // {settings, seq, employees, products, sales}
+let cart = [];                       // [{pid, name, price, qty}]
+let discount = {type:null, value:0}; // type: 'pct' | 'amt'
+let cashierId = null;
+let activeCat = "All";
+let repRange = "today";
+let payState = null;                 // transient payment modal state
+let storageOK = false;
+
+/* ---------------- persistence ---------------- */
+async function loadDB(){
+  try{
+    if(window.storage){
+      const r = await window.storage.get("pos-db");
+      if(r && r.value){ db = JSON.parse(r.value); storageOK = true; migrate(); return; }
+      storageOK = true; // key just doesn't exist yet
+    }
+  }catch(e){ /* key missing or storage unavailable */ try{ if(window.storage) storageOK = true; }catch(_){} }
+  db = JSON.parse(JSON.stringify(DEFAULTS));
+  persist();
+}
+function migrate(){
+  db.settings = Object.assign({}, DEFAULTS.settings, db.settings||{});
+  db.products = db.products||[]; db.sales = db.sales||[]; db.employees = db.employees||[];
+  if(!db.seq) db.seq = 1001;
+}
+let saveTimer = null;
+function persist(){
+  if(!storageOK || !window.storage) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{ await window.storage.set("pos-db", JSON.stringify(db)); }
+    catch(e){ console.error("save failed", e); }
+  }, 250);
+}
+
+/* ---------------- helpers ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => db.settings.currency + Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const uid = p => p + Math.random().toString(36).slice(2,9);
+const emp = id => db.employees.find(e=>e.id===id);
+function toast(msg, err){
+  const t = $("#toast");
+  t.textContent = msg; t.className = err ? "on err" : "on";
+  clearTimeout(t._h); t._h = setTimeout(()=>t.className="", 2400);
+}
+function stockClass(p){ return p.stock<=0 ? "out" : (p.stock<=p.low ? "low" : "ok"); }
+function stockLabel(p){ return p.stock<=0 ? "Out of stock" : (p.stock<=p.low ? "Low stock" : "In stock"); }
+
+/* cart math */
+function totals(){
+  const sub = cart.reduce((s,l)=>s + l.price*l.qty, 0);
+  let disc = 0;
+  if(discount.type==="pct") disc = sub * (discount.value/100);
+  if(discount.type==="amt") disc = Math.min(discount.value, sub);
+  const taxable = Math.max(sub - disc, 0);
+  const tax = taxable * (db.settings.taxRate/100);
+  return { sub, disc, tax, total: taxable + tax };
+}
+
+/* ---------------- navigation ---------------- */
+document.querySelectorAll("[data-nav]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("[data-nav]").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+    $("#view-"+b.dataset.nav).classList.add("on");
+    renderAll();
+    if(b.dataset.nav==="register") $("#scanInput").focus();
+  });
+});
+
+/* ---------------- register ---------------- */
+function renderCats(){
+  const cats = ["All", ...new Set(db.products.map(p=>p.cat).filter(Boolean))];
+  $("#catChips").innerHTML = cats.map(c=>`<button data-cat="${esc(c)}" class="${c===activeCat?'on':''}">${esc(c)}</button>`).join("");
+}
+$("#catChips").addEventListener("click", e=>{
+  const b = e.target.closest("[data-cat]"); if(!b) return;
+  activeCat = b.dataset.cat; renderCats(); renderGrid();
+});
+function renderGrid(){
+  const q = $("#prodSearch").value.trim().toLowerCase();
+  const list = db.products.filter(p=>
+    (activeCat==="All" || p.cat===activeCat) &&
+    (!q || p.name.toLowerCase().includes(q) || String(p.sku).toLowerCase().includes(q))
+  );
+  $("#prodGrid").innerHTML = list.length ? list.map(p=>{
+    const sc = p.stock<=0?"zero":(p.stock<=p.low?"warn":"");
+    return `<button class="ptile ${p.stock<=0?'out':''}" data-add="${p.id}">
+      <span class="cat">${esc(p.cat||"—")}</span>
+      <span class="nm">${esc(p.name)}</span>
+      <span class="row"><span class="pr">${fmt(p.price)}</span><span class="st ${sc}">${p.stock<=0?"OUT":"×"+p.stock}</span></span>
+    </button>`;
+  }).join("") : `<div class="empty" style="grid-column:1/-1"><b>No products match</b>Add products in Inventory, or clear the search.</div>`;
+}
+$("#prodSearch").addEventListener("input", renderGrid);
+$("#prodGrid").addEventListener("click", e=>{
+  const b = e.target.closest("[data-add]"); if(b) addToCart(b.dataset.add);
+});
+
+function addToCart(pid){
+  const p = db.products.find(x=>x.id===pid); if(!p) return;
+  const line = cart.find(l=>l.pid===pid);
+  const inCart = line ? line.qty : 0;
+  if(p.stock - inCart <= 0){ toast(`"${p.name}" — no more stock available`, true); return; }
+  if(line) line.qty++;
+  else cart.push({pid:p.id, name:p.name, price:p.price, qty:1});
+  renderCart();
+}
+function setQty(pid, d){
+  const line = cart.find(l=>l.pid===pid); if(!line) return;
+  const p = db.products.find(x=>x.id===pid);
+  if(d>0 && p && line.qty>=p.stock){ toast("Not enough stock", true); return; }
+  line.qty += d;
+  if(line.qty<=0) cart = cart.filter(l=>l!==line);
+  renderCart();
+}
+function renderCart(){
+  const box = $("#cartLines");
+  $("#rcptStore").textContent = db.settings.store;
+  const c = emp(cashierId);
+  $("#rcptMeta").textContent = new Date().toLocaleDateString() + (c ? "  ·  cashier: " + c.name : "  ·  no cashier signed in");
+  if(!cart.length){
+    box.innerHTML = `<div class="rempty">Register is clear.<br>Scan an item or tap a product to begin.</div>`;
+  }else{
+    box.innerHTML = cart.map(l=>`
+      <div class="rline">
+        <span class="n">${esc(l.name)}</span>
+        <span class="amt">${fmt(l.price*l.qty)}</span>
+        <span class="sub">
+          <button class="qbtn" data-q="-1" data-pid="${l.pid}">−</button>
+          <span>${l.qty} × ${fmt(l.price)}</span>
+          <button class="qbtn" data-q="1" data-pid="${l.pid}">+</button>
+          <button class="qbtn x" data-rm="${l.pid}" title="Remove">×</button>
+        </span>
+      </div>`).join("");
+    box.scrollTop = box.scrollHeight;
+  }
+  const t = totals();
+  $("#taxLbl").textContent = `Tax (${db.settings.taxRate}%)`;
+  $("#tSub").textContent = cart.length ? fmt(t.sub) : "—";
+  $("#tTax").textContent = cart.length ? fmt(t.tax) : "—";
+  $("#tTotal").textContent = cart.length ? fmt(t.total) : "—";
+  const dr = $("#discRow");
+  if(discount.type && cart.length){
+    dr.style.display = "flex";
+    $("#discLbl").textContent = discount.type==="pct" ? `Discount (${discount.value}%)` : "Discount";
+    $("#tDisc").textContent = "−"+fmt(t.disc);
+    $("#discBtn").textContent = "edit discount";
+  }else{ dr.style.display = "none"; $("#discBtn").textContent = "+ add discount"; }
+  const btn = $("#chargeBtn");
+  btn.disabled = !cart.length;
+  btn.textContent = cart.length ? "CHARGE  " + fmt(t.total) : "CHARGE";
+}
+$("#cartLines").addEventListener("click", e=>{
+  const q = e.target.closest("[data-q]"); if(q){ setQty(q.dataset.pid, +q.dataset.q); return; }
+  const r = e.target.closest("[data-rm]"); if(r){ cart = cart.filter(l=>l.pid!==r.dataset.rm); renderCart(); }
+});
+$("#clearCart").addEventListener("click", ()=>{
+  if(!cart.length) return;
+  cart = []; discount = {type:null,value:0}; renderCart(); toast("Sale voided");
+});
+
+/* barcode / SKU entry */
+$("#scanInput").addEventListener("keydown", e=>{
+  if(e.key!=="Enter") return;
+  const code = e.target.value.trim(); if(!code) return;
+  const p = db.products.find(x=>String(x.sku).toLowerCase()===code.toLowerCase());
+  if(p){ addToCart(p.id); e.target.value=""; }
+  else{ toast(`No product with barcode "${code}"`, true); e.target.select(); }
+});
+
+/* ---------------- modal machinery ---------------- */
+function openModal(html, wide){
+  $("#modalBox").className = "modal"+(wide?" wide":"");
+  $("#modalBox").innerHTML = html;
+  $("#ovl").classList.add("on");
+}
+function closeModal(){ $("#ovl").classList.remove("on"); payState=null; }
+$("#ovl").addEventListener("click", e=>{ if(e.target.id==="ovl" && !(payState&&payState.busy)) closeModal(); });
+document.addEventListener("click", e=>{ if(e.target.closest(".mclose")) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !(payState&&payState.busy)) closeModal(); });
+
+/* ---------------- discount modal ---------------- */
+$("#discBtn").addEventListener("click", ()=>{
+  openModal(`
+    <div class="mhead"><h3>Discount</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <div class="frow">
+        <div class="field"><label>Type</label>
+          <select id="dType"><option value="pct" ${discount.type!=="amt"?"selected":""}>Percent (%)</option><option value="amt" ${discount.type==="amt"?"selected":""}>Fixed amount</option></select></div>
+        <div class="field"><label>Value</label><input id="dVal" type="number" min="0" step="0.01" value="${discount.value||""}"></div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="dClear">Remove discount</button>
+      <button class="btn grn" id="dApply">Apply</button>
+    </div>`);
+  $("#dApply").onclick = ()=>{
+    const type = $("#dType").value, v = parseFloat($("#dVal").value)||0;
+    if(v<=0){ discount={type:null,value:0}; }
+    else if(type==="pct" && v>100){ toast("Percent can't exceed 100", true); return; }
+    else discount = {type, value:v};
+    closeModal(); renderCart();
+  };
+  $("#dClear").onclick = ()=>{ discount={type:null,value:0}; closeModal(); renderCart(); };
+});
+
+/* ---------------- cashier picker ---------------- */
+function pickCashier(force){
+  const active = db.employees.filter(e=>e.active);
+  openModal(`
+    <div class="mhead"><h3>Who's on the register?</h3>${force?"":'<button class="mclose">×</button>'}</div>
+    <div class="mbody">
+      ${active.length ? `<div class="staff-pick">${active.map(e=>`
+        <button data-emp="${e.id}"><span class="avatar">${esc(e.name[0]||"?")}</span>
+        <span>${esc(e.name)}<br><small style="color:var(--mut);font-weight:400">${esc(e.role||"Cashier")}</small></span></button>`).join("")}</div>`
+      : `<div class="empty"><b>No active staff</b>Add a staff member first.</div>`}
+    </div>`);
+  $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>{
+    cashierId = b.dataset.emp; refreshCashierChip(); renderCart(); closeModal();
+    toast(emp(cashierId).name + " signed in");
+  });
+}
+$("#cashierChip").addEventListener("click", ()=>pickCashier(false));
+function refreshCashierChip(){
+  const c = emp(cashierId);
+  $("#cashAvatar").textContent = c ? (c.name[0]||"?") : "?";
+  $("#cashName").textContent = c ? c.name : "No cashier";
+}
+
+/* ---------------- payment flow ---------------- */
+$("#chargeBtn").addEventListener("click", ()=>{
+  if(!cart.length) return;
+  if(!cashierId || !emp(cashierId) || !emp(cashierId).active){ pickCashier(true); toast("Sign a cashier in first", true); return; }
+  payState = { method:"cash", tender:0, busy:false };
+  renderPayModal();
+});
+function renderPayModal(){
+  const t = totals();
+  const denoms = [t.total, Math.ceil(t.total/100)*100, Math.ceil(t.total/500)*500, Math.ceil(t.total/1000)*1000]
+    .filter((v,i,a)=>a.indexOf(v)===i).slice(0,4);
+  openModal(`
+    <div class="mhead"><h3>Take payment</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <div class="pay-methods">
+        <button data-m="cash" class="${payState.method==='cash'?'on':''}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M5.5 9.5h.01M18.5 14.5h.01"/></svg>Cash</button>
+        <button data-m="card" class="${payState.method==='card'?'on':''}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Card</button>
+        <button data-m="wallet" class="${payState.method==='wallet'?'on':''}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Mobile</button>
+      </div>
+      <div class="due-line"><span>Amount due</span><b>${fmt(t.total)}</b></div>
+      <div id="payDetail"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="payCancel">Cancel</button>
+      <button class="btn grn" id="payGo">Confirm payment</button>
+    </div>`);
+  const detail = $("#payDetail");
+  function drawDetail(){
+    if(payState.method==="cash"){
+      detail.innerHTML = `
+        <div class="field" style="margin-top:6px"><label>Cash tendered</label>
+          <input id="tenderIn" type="number" min="0" step="1" placeholder="0.00" value="${payState.tender||""}"></div>
+        <div class="quick-cash">${denoms.map(d=>`<button data-cash="${d}">${fmt(d)}</button>`).join("")}</div>
+        <div class="due-line big"><span>Change</span><span class="ch" id="changeOut">${fmt(Math.max((payState.tender||0)-t.total,0))}</span></div>`;
+      const inp = $("#tenderIn");
+      inp.focus();
+      inp.addEventListener("input", ()=>{
+        payState.tender = parseFloat(inp.value)||0;
+        $("#changeOut").textContent = fmt(Math.max(payState.tender - t.total, 0));
+      });
+      detail.querySelectorAll("[data-cash]").forEach(b=>b.onclick=()=>{
+        payState.tender = +b.dataset.cash; inp.value = payState.tender;
+        $("#changeOut").textContent = fmt(Math.max(payState.tender - t.total, 0));
+      });
+    }else{
+      const label = payState.method==="card" ? "The terminal will contact the card network to authorize the charge." : "Customer taps or scans with their mobile wallet to authorize.";
+      detail.innerHTML = `<p style="color:var(--mut);font-size:13px;padding:10px 2px 4px">${label}</p>`;
+    }
+  }
+  drawDetail();
+  $("#modalBox").querySelectorAll("[data-m]").forEach(b=>b.onclick = ()=>{
+    payState.method = b.dataset.m;
+    $("#modalBox").querySelectorAll("[data-m]").forEach(x=>x.classList.toggle("on", x===b));
+    drawDetail();
+  });
+  $("#payCancel").onclick = closeModal;
+  $("#payGo").onclick = ()=>{
+    const tt = totals();
+    if(payState.method==="cash" && (payState.tender||0) < tt.total - 0.001){
+      toast("Cash tendered is less than the amount due", true); return;
+    }
+    authorize(tt);
+  };
+}
+function authorize(t){
+  payState.busy = true;
+  const isCash = payState.method==="cash";
+  const steps = isCash
+    ? ["Recording payment…"]
+    : ["Contacting payment processor…", "Verifying with customer's bank…", "Clearing funds…"];
+  openModal(`
+    <div class="mhead"><h3>Processing</h3></div>
+    <div class="mbody"><div class="proc"><div class="spin"></div><div class="stat-msg" id="procMsg">${steps[0]}</div></div></div>`);
+  let i = 0;
+  const iv = setInterval(()=>{
+    i++;
+    if(i < steps.length){ $("#procMsg").textContent = steps[i]; return; }
+    clearInterval(iv);
+    completeSale(t);
+  }, isCash ? 500 : 750);
+}
+function completeSale(t){
+  const authCode = payState.method==="cash" ? null :
+    "AUTH-" + Math.random().toString(36).slice(2,8).toUpperCase();
+  const sale = {
+    id: "R-" + (db.seq++),
+    ts: Date.now(),
+    empId: cashierId,
+    empName: emp(cashierId) ? emp(cashierId).name : "—",
+    lines: cart.map(l=>{
+      const p = db.products.find(x=>x.id===l.pid);
+      return { pid:l.pid, name:l.name, sku:p?p.sku:"", cat:p?p.cat:"", price:l.price, qty:l.qty };
+    }),
+    sub:+t.sub.toFixed(2), disc:+t.disc.toFixed(2), tax:+t.tax.toFixed(2), total:+t.total.toFixed(2),
+    method: payState.method,
+    tender: payState.method==="cash" ? +payState.tender.toFixed(2) : null,
+    change: payState.method==="cash" ? +(payState.tender - t.total).toFixed(2) : null,
+    auth: authCode
+  };
+  // backend updates: log sale + decrement inventory in real time
+  sale.lines.forEach(l=>{
+    const p = db.products.find(x=>x.id===l.pid);
+    if(p) p.stock = Math.max(0, p.stock - l.qty);
+  });
+  db.sales.unshift(sale);
+  persist();
+  cart = []; discount = {type:null,value:0};
+  payState.busy = false;
+  showFinalReceipt(sale, true);
+  renderAll();
+}
+
+/* ---------------- receipt render / print ---------------- */
+function receiptHTML(s){
+  const st = db.settings;
+  const methodName = {cash:"CASH", card:"CARD", wallet:"MOBILE WALLET"}[s.method]||s.method;
+  return `
+    <div class="c" style="font-weight:700;letter-spacing:.5px">${esc(st.store).toUpperCase()}</div>
+    <div class="c" style="font-size:10.5px">${new Date(s.ts).toLocaleString()}</div>
+    <div class="c" style="font-size:10.5px">Receipt ${esc(s.id)} · Cashier: ${esc(s.empName)}</div>
+    <hr>
+    ${s.lines.map(l=>`
+      <div class="fr-line"><span>${esc(l.name)}</span><span>${fmt(l.price*l.qty)}</span></div>
+      <div style="font-size:10.5px;color:#6d6a5d">&nbsp;&nbsp;${l.qty} × ${fmt(l.price)}${l.sku?` · SKU ${esc(l.sku)}`:""}</div>`).join("")}
+    <hr>
+    <div class="fr-line"><span>Subtotal</span><span>${fmt(s.sub)}</span></div>
+    ${s.disc>0?`<div class="fr-line"><span>Discount</span><span>−${fmt(s.disc)}</span></div>`:""}
+    <div class="fr-line"><span>Tax (${st.taxRate}%)</span><span>${fmt(s.tax)}</span></div>
+    <div class="fr-line tot"><span>TOTAL</span><span>${fmt(s.total)}</span></div>
+    <hr>
+    <div class="fr-line"><span>Paid — ${methodName}</span><span>${fmt(s.method==="cash"?s.tender:s.total)}</span></div>
+    ${s.method==="cash"?`<div class="fr-line"><span>Change</span><span>${fmt(s.change)}</span></div>`:""}
+    ${s.auth?`<div class="fr-line"><span>Approval</span><span>${esc(s.auth)}</span></div>`:""}
+    <hr>
+    <div class="c" style="font-size:10.5px">${esc(st.footer)}</div>`;
+}
+function showFinalReceipt(s, fresh){
+  openModal(`
+    <div class="mhead"><h3>${fresh ? "Payment approved" : "Receipt " + esc(s.id)}</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      ${fresh?`<div class="approved">✓</div>`:""}
+      <div class="final-receipt">${receiptHTML(s)}</div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="printRcpt">Print receipt</button>
+      <button class="btn grn" id="newSale">${fresh?"New sale":"Done"}</button>
+    </div>`);
+  $("#printRcpt").onclick = ()=>{ $("#printArea").innerHTML = receiptHTML(s); window.print(); };
+  $("#newSale").onclick = ()=>{ closeModal(); if(fresh){ renderCart(); $("#scanInput").focus(); } };
+}
+
+/* ---------------- inventory ---------------- */
+function renderInventory(){
+  const q = ($("#invSearch").value||"").trim().toLowerCase();
+  const list = db.products.filter(p=>!q || p.name.toLowerCase().includes(q) || String(p.sku).toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
+  const low = db.products.filter(p=>p.stock>0 && p.stock<=p.low).length;
+  const out = db.products.filter(p=>p.stock<=0).length;
+  const value = db.products.reduce((s,p)=>s + (p.cost||0)*p.stock, 0);
+  $("#invStats").innerHTML = `
+    <div class="card stat"><div class="lbl">Products</div><div class="val">${db.products.length}</div></div>
+    <div class="card stat"><div class="lbl">Stock value (cost)</div><div class="val">${fmt(value)}</div></div>
+    <div class="card stat"><div class="lbl">Low stock</div><div class="val" style="color:${low?'var(--amb)':'inherit'}">${low}</div></div>
+    <div class="card stat"><div class="lbl">Out of stock</div><div class="val" style="color:${out?'var(--red)':'inherit'}">${out}</div></div>`;
+  $("#invBody").innerHTML = list.length ? list.map(p=>`
+    <tr>
+      <td style="font-weight:700">${esc(p.name)}</td>
+      <td style="font-family:var(--mono);font-size:12.5px">${esc(p.sku)}</td>
+      <td>${esc(p.cat||"—")}</td>
+      <td class="num">${fmt(p.price)}</td>
+      <td class="num" style="color:var(--mut)">${fmt(p.cost||0)}</td>
+      <td class="num" style="font-weight:700">${p.stock}</td>
+      <td><span class="badge ${stockClass(p)}">${stockLabel(p)}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn sm" data-restock="${p.id}">Restock</button>
+        <button class="btn sm" data-edit="${p.id}">Edit</button>
+        <button class="btn sm red" data-del="${p.id}">Delete</button>
+      </td>
+    </tr>`).join("") :
+    `<tr><td colspan="8"><div class="empty"><b>No products yet</b>Click “Add product” to build your library.</div></td></tr>`;
+}
+$("#invSearch").addEventListener("input", renderInventory);
+$("#addProdBtn").addEventListener("click", ()=>productModal(null));
+$("#invBody").addEventListener("click", e=>{
+  const ed = e.target.closest("[data-edit]"); if(ed) return productModal(ed.dataset.edit);
+  const rs = e.target.closest("[data-restock]"); if(rs) return restockModal(rs.dataset.restock);
+  const dl = e.target.closest("[data-del]");
+  if(dl){
+    const p = db.products.find(x=>x.id===dl.dataset.del);
+    confirmModal(`Delete “${esc(p.name)}”?`, "Past sales keep their records; the product just leaves the library.", ()=>{
+      db.products = db.products.filter(x=>x.id!==p.id);
+      persist(); renderAll(); toast("Product deleted");
+    });
+  }
+});
+function productModal(pid){
+  const p = pid ? db.products.find(x=>x.id===pid) : null;
+  openModal(`
+    <div class="mhead"><h3>${p?"Edit product":"Add product"}</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <div class="field"><label>Product name</label><input id="fName" value="${p?esc(p.name):""}"></div>
+      <div class="frow">
+        <div class="field"><label>SKU / Barcode</label><input id="fSku" value="${p?esc(p.sku):""}" placeholder="e.g. 6001"></div>
+        <div class="field"><label>Category</label><input id="fCat" value="${p?esc(p.cat):""}" list="catList" placeholder="e.g. Drinks">
+          <datalist id="catList">${[...new Set(db.products.map(x=>x.cat).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Selling price</label><input id="fPrice" type="number" min="0" step="0.01" value="${p?p.price:""}"></div>
+        <div class="field"><label>Cost price</label><input id="fCost" type="number" min="0" step="0.01" value="${p?(p.cost||""):""}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Stock on hand</label><input id="fStock" type="number" min="0" step="1" value="${p?p.stock:""}"></div>
+        <div class="field"><label>Low-stock alert at</label><input id="fLow" type="number" min="0" step="1" value="${p?p.low:5}"></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="fSave">${p?"Save changes":"Add product"}</button></div>`, true);
+  $("#fName").focus();
+  $("#fSave").onclick = ()=>{
+    const name = $("#fName").value.trim(), sku = $("#fSku").value.trim();
+    const price = parseFloat($("#fPrice").value);
+    if(!name){ toast("Name is required", true); return; }
+    if(!sku){ toast("SKU / barcode is required — it's how the scanner finds it", true); return; }
+    if(!(price>=0) || $("#fPrice").value===""){ toast("Enter a selling price", true); return; }
+    const dupe = db.products.find(x=>String(x.sku).toLowerCase()===sku.toLowerCase() && (!p || x.id!==p.id));
+    if(dupe){ toast(`Barcode "${sku}" already belongs to ${dupe.name}`, true); return; }
+    const rec = {
+      name, sku, cat: $("#fCat").value.trim(),
+      price:+price.toFixed(2),
+      cost: parseFloat($("#fCost").value)||0,
+      stock: Math.max(0, parseInt($("#fStock").value)||0),
+      low: Math.max(0, parseInt($("#fLow").value)||0)
+    };
+    if(p) Object.assign(p, rec);
+    else db.products.push(Object.assign({id:uid("p")}, rec));
+    persist(); closeModal(); renderAll();
+    toast(p?"Product updated":"Product added");
+  };
+}
+function restockModal(pid){
+  const p = db.products.find(x=>x.id===pid); if(!p) return;
+  openModal(`
+    <div class="mhead"><h3>Restock — ${esc(p.name)}</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <p style="color:var(--mut);font-size:13px;margin-bottom:12px">Currently <b style="color:var(--text)">${p.stock}</b> in stock.</p>
+      <div class="field"><label>Add quantity (use a negative number to correct down)</label><input id="rQty" type="number" step="1" placeholder="e.g. 24"></div>
+    </div>
+    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="rGo">Update stock</button></div>`);
+  $("#rQty").focus();
+  $("#rGo").onclick = ()=>{
+    const d = parseInt($("#rQty").value);
+    if(isNaN(d) || d===0){ toast("Enter a quantity", true); return; }
+    p.stock = Math.max(0, p.stock + d);
+    persist(); closeModal(); renderAll();
+    toast(`${p.name}: stock now ${p.stock}`);
+  };
+}
+
+/* ---------------- sales log ---------------- */
+function renderSales(){
+  const body = $("#salesBody");
+  body.innerHTML = db.sales.length ? db.sales.map(s=>`
+    <tr>
+      <td style="font-family:var(--mono);font-weight:600">${esc(s.id)}</td>
+      <td>${new Date(s.ts).toLocaleString()}</td>
+      <td>${esc(s.empName)}</td>
+      <td class="num">${s.lines.reduce((a,l)=>a+l.qty,0)}</td>
+      <td><span class="badge gray">${{cash:"Cash",card:"Card",wallet:"Mobile"}[s.method]||s.method}</span></td>
+      <td class="num" style="font-weight:700">${fmt(s.total)}</td>
+      <td style="text-align:right"><button class="btn sm" data-view="${esc(s.id)}">Receipt</button></td>
+    </tr>`).join("") :
+    `<tr><td colspan="7"><div class="empty"><b>No sales yet</b>Completed transactions land here automatically.</div></td></tr>`;
+}
+$("#salesBody").addEventListener("click", e=>{
+  const b = e.target.closest("[data-view]"); if(!b) return;
+  const s = db.sales.find(x=>x.id===b.dataset.view);
+  if(s) showFinalReceipt(s, false);
+});
+$("#exportCsv").addEventListener("click", ()=>{
+  if(!db.sales.length){ toast("Nothing to export yet", true); return; }
+  const rows = [["Receipt","Date","Cashier","Method","Item","SKU","Qty","Unit price","Line total","Sale subtotal","Discount","Tax","Sale total"]];
+  db.sales.forEach(s=>s.lines.forEach(l=>rows.push([
+    s.id, new Date(s.ts).toISOString(), s.empName, s.method, l.name, l.sku, l.qty, l.price, (l.price*l.qty).toFixed(2), s.sub, s.disc, s.tax, s.total
+  ])));
+  const csv = rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download = "sales-export.csv"; a.click(); URL.revokeObjectURL(a.href);
+});
+
+/* ---------------- reports ---------------- */
+$("#repRange").addEventListener("click", e=>{
+  const b = e.target.closest("[data-r]"); if(!b) return;
+  repRange = b.dataset.r;
+  document.querySelectorAll("#repRange button").forEach(x=>x.classList.toggle("on", x===b));
+  renderReports();
+});
+function salesInRange(){
+  const now = new Date();
+  if(repRange==="all") return db.sales;
+  if(repRange==="today"){
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return db.sales.filter(s=>s.ts>=start);
+  }
+  const days = +repRange;
+  return db.sales.filter(s=>s.ts >= now.getTime() - days*86400000);
+}
+function bars(box, pairs, money){
+  if(!pairs.length){ box.innerHTML = `<div class="empty" style="padding:26px"><b>No data in this range</b></div>`; return; }
+  const max = Math.max(...pairs.map(p=>p[1]));
+  box.innerHTML = pairs.slice(0,8).map(([n,v,extra])=>`
+    <div class="bar-row"><span class="bn" title="${esc(n)}">${esc(n)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${max?Math.max(v/max*100,3):0}%"></span></span>
+      <span class="bv">${money?fmt(v):v}${extra?` <span style="color:var(--mut)">${extra}</span>`:""}</span></div>`).join("");
+  box.style.padding = "6px 0 10px";
+}
+function renderReports(){
+  const list = salesInRange();
+  const rev = list.reduce((s,x)=>s+x.total,0);
+  const items = list.reduce((s,x)=>s + x.lines.reduce((a,l)=>a+l.qty,0),0);
+  const profit = list.reduce((s,x)=>s + x.lines.reduce((a,l)=>{
+    const p = db.products.find(y=>y.id===l.pid);
+    return a + (l.price - (p?p.cost||0:0))*l.qty;
+  },0) - x.disc, 0);
+  $("#repStats").innerHTML = `
+    <div class="card stat"><div class="lbl">Revenue</div><div class="val" style="color:var(--grn)">${fmt(rev)}</div></div>
+    <div class="card stat"><div class="lbl">Transactions</div><div class="val">${list.length}</div></div>
+    <div class="card stat"><div class="lbl">Items sold</div><div class="val">${items}</div></div>
+    <div class="card stat"><div class="lbl">Avg sale</div><div class="val">${fmt(list.length?rev/list.length:0)}</div></div>
+    <div class="card stat"><div class="lbl">Est. gross profit</div><div class="val">${fmt(profit)}</div><div class="sub2">price − cost, after discounts</div></div>`;
+  const agg = (keyFn, valFn) => {
+    const m = new Map();
+    list.forEach(s=>s.lines.forEach(l=>{
+      const k = keyFn(s,l); if(k==null) return;
+      m.set(k, (m.get(k)||0) + valFn(s,l));
+    }));
+    return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+  };
+  bars($("#topItems"), agg((s,l)=>l.name, (s,l)=>l.price*l.qty).map(([n,v])=>[n,v]), true);
+  const staffMap = new Map();
+  list.forEach(s=>{ const e = staffMap.get(s.empName)||{rev:0,n:0}; e.rev+=s.total; e.n++; staffMap.set(s.empName,e); });
+  bars($("#byStaff"), [...staffMap.entries()].sort((a,b)=>b[1].rev-a[1].rev).map(([n,e])=>[n, e.rev, `· ${e.n} sale${e.n===1?"":"s"}`]), true);
+  const methodMap = new Map();
+  list.forEach(s=>methodMap.set(s.method,(methodMap.get(s.method)||0)+s.total));
+  bars($("#byMethod"), [...methodMap.entries()].sort((a,b)=>b[1]-a[1]).map(([m,v])=>[{cash:"Cash",card:"Card",wallet:"Mobile wallet"}[m]||m, v]), true);
+  bars($("#byCat"), agg((s,l)=>l.cat||"Uncategorized", (s,l)=>l.price*l.qty), true);
+}
+
+/* ---------------- staff ---------------- */
+function renderStaff(){
+  $("#staffBody").innerHTML = db.employees.length ? db.employees.map(e=>{
+    const sales = db.sales.filter(s=>s.empId===e.id);
+    const rev = sales.reduce((a,s)=>a+s.total,0);
+    return `<tr>
+      <td style="font-weight:700">${esc(e.name)}${e.id===cashierId?' <span class="badge ok">on register</span>':""}</td>
+      <td>${esc(e.role||"Cashier")}</td>
+      <td class="num">${sales.length}</td>
+      <td class="num">${fmt(rev)}</td>
+      <td><span class="badge ${e.active?"ok":"gray"}">${e.active?"Active":"Inactive"}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn sm" data-tgl="${e.id}">${e.active?"Deactivate":"Activate"}</button>
+        <button class="btn sm" data-eedit="${e.id}">Edit</button>
+        <button class="btn sm red" data-edel="${e.id}">Delete</button>
+      </td></tr>`;
+  }).join("") : `<tr><td colspan="6"><div class="empty"><b>No staff yet</b>Add at least one person to run the register.</div></td></tr>`;
+}
+$("#addStaffBtn").addEventListener("click", ()=>staffModal(null));
+$("#staffBody").addEventListener("click", e=>{
+  const t = e.target.closest("[data-tgl]");
+  if(t){ const s = db.employees.find(x=>x.id===t.dataset.tgl); s.active=!s.active;
+    if(!s.active && cashierId===s.id){ cashierId=null; refreshCashierChip(); }
+    persist(); renderStaff(); return; }
+  const ed = e.target.closest("[data-eedit]"); if(ed) return staffModal(ed.dataset.eedit);
+  const dl = e.target.closest("[data-edel]");
+  if(dl){
+    const s = db.employees.find(x=>x.id===dl.dataset.edel);
+    confirmModal(`Remove ${esc(s.name)}?`, "Their name stays on past receipts; they just can't be signed in anymore.", ()=>{
+      db.employees = db.employees.filter(x=>x.id!==s.id);
+      if(cashierId===s.id){ cashierId=null; refreshCashierChip(); }
+      persist(); renderStaff(); toast("Staff member removed");
+    });
+  }
+});
+function staffModal(id){
+  const s = id ? db.employees.find(x=>x.id===id) : null;
+  openModal(`
+    <div class="mhead"><h3>${s?"Edit staff member":"Add staff member"}</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <div class="field"><label>Full name</label><input id="sName" value="${s?esc(s.name):""}"></div>
+      <div class="field"><label>Role</label><input id="sRole" value="${s?esc(s.role||""):""}" placeholder="e.g. Cashier, Supervisor"></div>
+    </div>
+    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="sSave">${s?"Save":"Add"}</button></div>`);
+  $("#sName").focus();
+  $("#sSave").onclick = ()=>{
+    const name = $("#sName").value.trim();
+    if(!name){ toast("Name is required", true); return; }
+    if(s){ s.name=name; s.role=$("#sRole").value.trim(); }
+    else db.employees.push({id:uid("e"), name, role:$("#sRole").value.trim()||"Cashier", active:true});
+    persist(); closeModal(); renderStaff(); refreshCashierChip();
+    toast(s?"Staff updated":"Staff member added");
+  };
+}
+
+/* ---------------- settings ---------------- */
+function renderSettings(){
+  $("#setStore").value = db.settings.store;
+  $("#setCur").value = db.settings.currency;
+  $("#setTax").value = db.settings.taxRate;
+  $("#setFoot").value = db.settings.footer;
+}
+$("#saveSettings").addEventListener("click", ()=>{
+  db.settings.store = $("#setStore").value.trim() || "My Store";
+  db.settings.currency = $("#setCur").value.trim() || "$";
+  db.settings.taxRate = Math.max(0, parseFloat($("#setTax").value)||0);
+  db.settings.footer = $("#setFoot").value.trim();
+  persist(); renderAll(); toast("Settings saved");
+});
+$("#resetData").addEventListener("click", ()=>{
+  confirmModal("Reset everything?", "All products, sales and staff will be replaced with the starter data. This can't be undone.", ()=>{
+    db = JSON.parse(JSON.stringify(DEFAULTS));
+    cart=[]; discount={type:null,value:0}; cashierId=null;
+    persist(); refreshCashierChip(); renderAll(); toast("System reset");
+  });
+});
+
+/* ---------------- confirm ---------------- */
+function confirmModal(title, body, onYes){
+  openModal(`
+    <div class="mhead"><h3>${title}</h3><button class="mclose">×</button></div>
+    <div class="mbody"><p style="color:var(--mut);font-size:13.5px;line-height:1.5">${body}</p></div>
+    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn red" id="cYes" style="border-color:var(--red)">Yes, do it</button></div>`);
+  $("#cYes").onclick = ()=>{ closeModal(); onYes(); };
+}
+
+/* ---------------- boot ---------------- */
+function renderAll(){
+  renderCats(); renderGrid(); renderCart();
+  renderInventory(); renderSales(); renderReports(); renderStaff(); renderSettings();
+}
+loadDB().then(()=>{
+  renderAll(); refreshCashierChip();
+  $("#scanInput").focus();
+  if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
+});
+})();
+</script>
+</body>
+</html>
