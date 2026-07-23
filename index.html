@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#141A23">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="POS SYS">
 <title>LedgerPoint POS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -146,7 +151,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 .seg button.on{background:var(--grn);color:#07130E}
 
 /* ---------- modal ---------- */
-.overlay{position:fixed;inset:0;background:rgba(6,9,13,.72);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+.overlay{position:fixed;inset:0;background:rgba(6,9,13,.72);display:none;align-items:center;justify-content:center;z-index:80;padding:18px}
 .overlay.on{display:flex}
 .modal{background:var(--ink2);border:1px solid var(--line);border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto}
 .modal.wide{max-width:560px}
@@ -182,8 +187,8 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 .final-receipt .tot{font-size:15px;font-weight:700}
 
 /* toast */
-#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink2);border:1px solid var(--line);border-left:3px solid var(--grn);padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;z-index:99;transition:transform .25s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-#toast.on{transform:translateX(-50%) translateY(0)}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);opacity:0;pointer-events:none;background:var(--ink2);border:1px solid var(--line);border-left:3px solid var(--grn);padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;z-index:99;transition:transform .25s,opacity .25s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#toast.on{transform:translateX(-50%) translateY(0);opacity:1}
 #toast.err{border-left-color:var(--red)}
 
 /* cashier picker */
@@ -203,6 +208,37 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   #printArea .tot{font-size:13px;font-weight:700}
 }
 
+/* ---------- motion / animation ---------- */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.93) translateY(14px)}to{opacity:1;transform:none}}
+@keyframes lineIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.view.on{animation:fadeUp .28s ease}
+.overlay.on .modal{animation:popIn .24s cubic-bezier(.25,.9,.35,1.15)}
+.rline{animation:lineIn .2s ease}
+.btn,.ptile,.nav button,.chips button,.pay-methods button,.quick-cash button{transition:background .15s,border-color .15s,color .15s,transform .1s}
+.btn:active{transform:scale(.96)}
+.bar-fill{transition:width .5s cubic-bezier(.25,.9,.35,1)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- category dropdown (mobile) ---------- */
+.catselect{display:none;margin-bottom:12px}
+
+/* ---------- table scroll wrapper ---------- */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ---------- bottom navigation (mobile) ---------- */
+.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(20,26,35,.97);backdrop-filter:blur(12px);border-top:1px solid var(--line);grid-template-columns:repeat(6,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+.bottom-nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border-radius:9px;color:var(--mut);font-size:10px;font-weight:700;letter-spacing:.2px}
+.bottom-nav button svg{width:20px;height:20px}
+.bottom-nav button.on{color:var(--grn);background:rgba(47,165,123,.1)}
+
+/* ---------- mobile cart bar + bottom sheet ---------- */
+.cart-fab{display:none;position:fixed;left:14px;right:14px;z-index:39;align-items:center;justify-content:space-between;gap:10px;background:var(--grn);color:#07130E;font-weight:800;font-size:15px;padding:14px 18px;border-radius:13px;box-shadow:0 10px 28px rgba(0,0,0,.5);transform:translateY(150%);opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.3,1.1,.4,1),opacity .25s}
+.cart-fab .fab-count{background:#07130E;color:var(--grn);font-family:var(--mono);font-size:12px;font-weight:700;border-radius:99px;padding:2px 9px;margin-right:8px}
+.sheet-backdrop{position:fixed;inset:0;background:rgba(6,9,13,.62);z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
+.sheet-backdrop.on{opacity:1;pointer-events:auto}
+.sheet-handle{display:none}
+
 @media(max-width:980px){
   .app{grid-template-columns:64px 1fr}
   .brand h1,.brand small,.nav button span,.cashier-chip .txt{display:none}
@@ -211,6 +247,48 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   #view-register{grid-template-columns:1fr;height:auto}
   .reg-right{height:460px}
   .two-col{grid-template-columns:1fr}
+}
+
+@media(max-width:740px){
+  input,select,textarea{font-size:16px} /* stops iOS auto-zoom on focus */
+  .app{grid-template-columns:1fr;height:auto;min-height:100dvh;overflow:visible}
+  .side{display:none}
+  .bottom-nav{display:grid}
+  .main{overflow:visible;min-width:0;max-width:100vw;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  .view{padding:16px 14px 30px}
+  .vhead{margin-bottom:14px}
+  .vhead h2{font-size:21px}
+  .vhead>div[style], .vhead input{width:100%!important;max-width:none!important}
+  .stat-row{grid-template-columns:repeat(2,1fr);gap:9px}
+  .stat .val{font-size:19px}
+  .tbl-wrap table{min-width:620px}
+  .seg{overflow-x:auto;max-width:100%}
+  /* register */
+  #view-register{padding:14px 14px 30px;height:auto}
+  #view-register.on{display:block}
+  .reg-left{display:block;overflow:visible}
+  .scanbar{flex-direction:column}
+  .scanbar #prodSearch{max-width:none!important}
+  .chips{display:none}
+  .catselect{display:block}
+  .pgrid{overflow:visible;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));padding-bottom:110px}
+  .ptile{min-height:104px}
+  /* cart becomes a slide-up sheet */
+  .cart-fab{display:flex;bottom:calc(74px + env(safe-area-inset-bottom))}
+  .cart-fab.show{transform:none;opacity:1;pointer-events:auto}
+  .reg-right{position:fixed;left:0;right:0;bottom:0;z-index:60;height:88dvh;min-height:0;transform:translateY(105%);transition:transform .32s cubic-bezier(.32,.72,.28,1);background:var(--ink2);border:1px solid var(--line);border-bottom:none;border-radius:18px 18px 0 0;padding:6px 12px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -14px 44px rgba(0,0,0,.55)}
+  .reg-right.open{transform:none}
+  .sheet-handle{display:block;width:100%;padding:8px 0 12px;flex:none}
+  .sheet-handle::before{content:"";display:block;width:44px;height:5px;border-radius:99px;background:var(--line);margin:0 auto}
+  .receipt{border-radius:10px}
+  .charge{margin-top:10px}
+  #chargeBtn{padding:16px}
+  #toast{bottom:calc(88px + env(safe-area-inset-bottom));z-index:90;max-width:calc(100vw - 28px)}
+  /* modals slide from bottom on phones */
+  .overlay{align-items:flex-end;padding:0}
+  .modal{max-width:none;border-radius:18px 18px 0 0;max-height:92dvh}
+  .modal.wide{max-width:none}
+  .overlay.on .modal{animation:fadeUp .28s cubic-bezier(.32,.72,.28,1)}
 }
 </style>
 </head>
@@ -252,10 +330,18 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
           <input id="prodSearch" placeholder="Search products…" style="max-width:210px" autocomplete="off">
         </div>
         <div class="chips" id="catChips"></div>
+        <select class="catselect" id="catSelect" aria-label="Filter by category"></select>
         <div class="pgrid" id="prodGrid"></div>
       </div>
 
-      <div class="reg-right">
+      <button class="cart-fab" id="cartFab" aria-label="View order">
+        <span><span class="fab-count" id="fabCount">0</span>View order</span>
+        <span id="fabTotal"></span>
+      </button>
+      <div class="sheet-backdrop" id="sheetBack"></div>
+
+      <div class="reg-right" id="regRight">
+        <button class="sheet-handle" id="sheetClose" aria-label="Close order panel"></button>
         <div class="receipt">
           <div class="receipt-head">
             <div class="store" id="rcptStore">Store</div>
@@ -288,7 +374,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
         </div>
       </div>
       <div class="stat-row" id="invStats"></div>
-      <div class="card"><table>
+      <div class="card tbl-wrap"><table>
         <thead><tr><th>Product</th><th>SKU / Barcode</th><th>Category</th><th class="num">Price</th><th class="num">Cost</th><th class="num">In stock</th><th>Status</th><th></th></tr></thead>
         <tbody id="invBody"></tbody>
       </table></div>
@@ -300,7 +386,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
         <div><h2>Sales log</h2><p>Every completed transaction — who rang it up, how it was paid, and a reprintable receipt.</p></div>
         <button class="btn" id="exportCsv">Export CSV</button>
       </div>
-      <div class="card"><table>
+      <div class="card tbl-wrap"><table>
         <thead><tr><th>Receipt #</th><th>Date &amp; time</th><th>Cashier</th><th class="num">Items</th><th>Payment</th><th class="num">Total</th><th></th></tr></thead>
         <tbody id="salesBody"></tbody>
       </table></div>
@@ -334,7 +420,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
         <div><h2>Staff</h2><p>Every sale is logged against the cashier signed in on the register.</p></div>
         <button class="btn grn" id="addStaffBtn">+ Add staff member</button>
       </div>
-      <div class="card"><table>
+      <div class="card tbl-wrap"><table>
         <thead><tr><th>Name</th><th>Role</th><th class="num">Sales rung</th><th class="num">Revenue</th><th>Status</th><th></th></tr></thead>
         <tbody id="staffBody"></tbody>
       </table></div>
@@ -355,9 +441,29 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
           <button class="btn grn" id="saveSettings">Save settings</button>
         </div>
       </div>
+      <div class="card" style="max-width:520px;padding:20px;margin-top:14px">
+        <h3 style="border:none;padding:0 0 4px">Data &amp; local saves</h3>
+        <p id="saveStatus" style="color:var(--mut);font-size:13px;line-height:1.6;margin-bottom:14px"></p>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn grn" id="folderBtn">Set up POS SYS folder</button>
+          <button class="btn" id="backupNow">Save backup now</button>
+          <button class="btn" id="importBtn">Restore from backup</button>
+        </div>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
     </section>
   </main>
 </div>
+
+<!-- ============ BOTTOM NAV (mobile) ============ -->
+<nav class="bottom-nav">
+  <button data-nav="register" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6a2 2 0 012-2h6a2 2 0 012 2v2M7 13h4"/></svg>Register</button>
+  <button data-nav="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3.3 8.5L12 13l8.7-4.5M12 13v8.5"/></svg>Stock</button>
+  <button data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Sales</button>
+  <button data-nav="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
+  <button data-nav="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 010 6.4M18 14.7c2 .8 3.2 2.6 3.7 5.3"/></svg>Staff</button>
+  <button data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4.1 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4.1h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114.1 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.2a2 2 0 110 4.1h-.2a1.7 1.7 0 00-1.5 1z"/></svg>Settings</button>
+</nav>
 
 <!-- ============ MODALS ============ -->
 <div class="overlay" id="ovl">
@@ -369,8 +475,15 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 <script>
 /* =====================================================================
    LedgerPoint POS — single-file point of sale
-   State is persisted with window.storage when available (survives
-   sessions in Claude artifacts); otherwise it runs fully in memory.
+   Persistence, most durable first:
+     1. IndexedDB ("POS-SYS" database) — primary on-device store,
+        handles large sales histories for long-term use.
+     2. POS SYS folder on device storage (File System Access API) —
+        the app creates a folder named "POS SYS" on first use and
+        mirrors the full dataset to pos-sys-data.json after changes.
+     3. JSON backup download / restore — fallback for browsers
+        without folder access (e.g. iOS Safari), plus manual backups.
+     4. localStorage + window.storage — legacy fallbacks / migration.
 ===================================================================== */
 (function(){
 "use strict";
@@ -405,15 +518,56 @@ let repRange = "today";
 let payState = null;                 // transient payment modal state
 let storageOK = false;
 
-/* ---------------- persistence ---------------- */
+/* ---------------- persistence: IndexedDB (primary store) ---------------- */
+const IDB_NAME = "POS-SYS", IDB_KV = "kv";
+let idbConn = null;
+function idbOpen(){
+  if(idbConn) return Promise.resolve(idbConn);
+  return new Promise((res, rej)=>{
+    if(!window.indexedDB) return rej(new Error("IndexedDB unavailable"));
+    const r = indexedDB.open(IDB_NAME, 1);
+    r.onupgradeneeded = ()=>{ if(!r.result.objectStoreNames.contains(IDB_KV)) r.result.createObjectStore(IDB_KV); };
+    r.onsuccess = ()=>{ idbConn = r.result; idbConn.onclose = ()=>{ idbConn = null; }; res(idbConn); };
+    r.onerror = ()=>rej(r.error);
+    r.onblocked = ()=>rej(new Error("IndexedDB blocked"));
+  });
+}
+async function idbGet(key){
+  const d = await idbOpen();
+  return new Promise((res, rej)=>{
+    const q = d.transaction(IDB_KV).objectStore(IDB_KV).get(key);
+    q.onsuccess = ()=>res(q.result); q.onerror = ()=>rej(q.error);
+  });
+}
+async function idbSet(key, val){
+  const d = await idbOpen();
+  return new Promise((res, rej)=>{
+    const t = d.transaction(IDB_KV, "readwrite");
+    t.objectStore(IDB_KV).put(val, key);
+    t.oncomplete = res; t.onerror = ()=>rej(t.error); t.onabort = ()=>rej(t.error);
+  });
+}
+
 async function loadDB(){
+  // 1. IndexedDB — primary
+  try{
+    const v = await idbGet("pos-db");
+    storageOK = true;
+    if(v){ db = (typeof v === "string") ? JSON.parse(v) : v; migrate(); return; }
+  }catch(e){ console.warn("IndexedDB unavailable:", e); }
+  // 2. legacy window.storage (older artifact builds)
   try{
     if(window.storage){
       const r = await window.storage.get("pos-db");
-      if(r && r.value){ db = JSON.parse(r.value); storageOK = true; migrate(); return; }
-      storageOK = true; // key just doesn't exist yet
+      if(r && r.value){ db = JSON.parse(r.value); migrate(); persist(); return; }
     }
-  }catch(e){ /* key missing or storage unavailable */ try{ if(window.storage) storageOK = true; }catch(_){} }
+  }catch(e){ /* not present */ }
+  // 3. localStorage fallback / migration
+  try{
+    const v = localStorage.getItem("pos-db");
+    if(v){ db = JSON.parse(v); migrate(); persist(); return; }
+  }catch(e){ /* blocked */ }
+  // 4. fresh start
   db = JSON.parse(JSON.stringify(DEFAULTS));
   persist();
 }
@@ -424,12 +578,108 @@ function migrate(){
 }
 let saveTimer = null;
 function persist(){
-  if(!storageOK || !window.storage) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set("pos-db", JSON.stringify(db)); }
-    catch(e){ console.error("save failed", e); }
+    const json = JSON.stringify(db);
+    if(storageOK){
+      try{ await idbSet("pos-db", json); }
+      catch(e){ console.error("IndexedDB save failed", e); }
+    }
+    // small mirrors so data survives even if IndexedDB is cleared
+    try{ localStorage.setItem("pos-db", json); }catch(e){ /* quota — IndexedDB is primary */ }
+    if(window.storage){ try{ await window.storage.set("pos-db", json); }catch(e){} }
+    scheduleFolderSave();
   }, 250);
+}
+
+/* ---------------- persistence: "POS SYS" folder on device ---------------- */
+const FS_SUPPORTED = "showDirectoryPicker" in window;
+let dirHandle = null, folderTimer = null, folderWarned = false;
+
+async function loadDirHandle(){
+  try{ const h = await idbGet("pos-dir"); if(h) dirHandle = h; }catch(e){}
+}
+async function verifyPerm(handle, ask){
+  try{
+    if((await handle.queryPermission({mode:"readwrite"})) === "granted") return true;
+    if(ask && (await handle.requestPermission({mode:"readwrite"})) === "granted") return true;
+  }catch(e){}
+  return false;
+}
+/* User picks where to keep data; the app creates the "POS SYS" folder inside it. */
+async function setupFolder(){
+  if(!FS_SUPPORTED){ downloadBackup(); return false; }
+  try{
+    const parent = await window.showDirectoryPicker({mode:"readwrite"});
+    dirHandle = (parent.name === "POS SYS") ? parent : await parent.getDirectoryHandle("POS SYS", {create:true});
+    if(!(await verifyPerm(dirHandle, true))) throw new Error("Permission was not granted");
+    await idbSet("pos-dir", dirHandle);
+    await writeFolderFile();
+    toast("POS SYS folder created — data now saves to device storage");
+    updateSaveStatus();
+    return true;
+  }catch(e){
+    if(e && e.name !== "AbortError") toast("Couldn't set up the folder: " + (e.message||e.name), true);
+    updateSaveStatus();
+    return false;
+  }
+}
+function backupPayload(){
+  return JSON.stringify({app:"POS SYS", version:1, exported:new Date().toISOString(), data:db}, null, 2);
+}
+async function writeFolderFile(){
+  if(!dirHandle) return false;
+  if(!(await verifyPerm(dirHandle, false))){
+    if(!folderWarned){ folderWarned = true; toast("POS SYS folder needs permission — reconnect it in Settings", true); }
+    updateSaveStatus();
+    return false;
+  }
+  try{
+    const f = await dirHandle.getFileHandle("pos-sys-data.json", {create:true});
+    const w = await f.createWritable();
+    await w.write(backupPayload());
+    await w.close();
+    return true;
+  }catch(e){ console.error("folder save failed", e); return false; }
+}
+function scheduleFolderSave(){
+  if(!dirHandle) return;
+  clearTimeout(folderTimer);
+  folderTimer = setTimeout(writeFolderFile, 1200);
+}
+/* Fallback for browsers without folder access: JSON file to Downloads. */
+function downloadBackup(){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([backupPayload()], {type:"application/json"}));
+  a.download = "POS-SYS-backup-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function restoreFromObject(obj){
+  const data = obj && obj.app === "POS SYS" ? obj.data : obj;
+  if(!data || !Array.isArray(data.products) || !Array.isArray(data.sales) || !Array.isArray(data.employees)){
+    toast("That file isn't a valid POS SYS backup", true); return;
+  }
+  confirmModal("Restore this backup?", "Current products, sales and staff will be replaced by the backup file. This can't be undone.", ()=>{
+    db = data; migrate();
+    cart = []; discount = {type:null, value:0}; cashierId = null;
+    persist(); refreshCashierChip(); renderAll();
+    toast("Backup restored");
+  });
+}
+async function updateSaveStatus(){
+  const el = document.getElementById("saveStatus"); if(!el) return;
+  let folder;
+  if(dirHandle) folder = (await verifyPerm(dirHandle, false))
+    ? "Connected — saving pos-sys-data.json to your “POS SYS” folder"
+    : "Found, but needs permission — tap “Reconnect POS SYS folder”";
+  else folder = FS_SUPPORTED
+    ? "Not set up yet — tap “Set up POS SYS folder”"
+    : "Folder access isn't supported by this browser — use “Save backup now” to download POS SYS JSON backups";
+  el.innerHTML =
+    `<b style="color:var(--text)">On-device database:</b> ${storageOK ? "IndexedDB active — data stays on this device" : "unavailable — running in memory only"}<br>` +
+    `<b style="color:var(--text)">POS SYS folder:</b> ${folder}`;
+  const fb = document.getElementById("folderBtn");
+  if(fb) fb.textContent = dirHandle ? "Reconnect POS SYS folder" : "Set up POS SYS folder";
 }
 
 /* ---------------- helpers ---------------- */
@@ -457,26 +707,35 @@ function totals(){
   return { sub, disc, tax, total: taxable + tax };
 }
 
-/* ---------------- navigation ---------------- */
+/* ---------------- navigation (sidebar + mobile bottom nav stay in sync) ---------------- */
+const isMobile = ()=>window.matchMedia("(max-width:740px)").matches;
+function focusScan(){ if(!isMobile()) $("#scanInput").focus(); } // no keyboard pop-up on phones
 document.querySelectorAll("[data-nav]").forEach(b=>{
   b.addEventListener("click", ()=>{
-    document.querySelectorAll("[data-nav]").forEach(x=>x.classList.remove("on"));
-    b.classList.add("on");
+    document.querySelectorAll("[data-nav]").forEach(x=>x.classList.toggle("on", x.dataset.nav===b.dataset.nav));
     document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
     $("#view-"+b.dataset.nav).classList.add("on");
+    toggleSheet(false);
     renderAll();
-    if(b.dataset.nav==="register") $("#scanInput").focus();
+    if(b.dataset.nav==="register") focusScan();
+    if(b.dataset.nav==="settings") updateSaveStatus();
   });
 });
 
 /* ---------------- register ---------------- */
 function renderCats(){
   const cats = ["All", ...new Set(db.products.map(p=>p.cat).filter(Boolean))];
+  if(!cats.includes(activeCat)) activeCat = "All";
   $("#catChips").innerHTML = cats.map(c=>`<button data-cat="${esc(c)}" class="${c===activeCat?'on':''}">${esc(c)}</button>`).join("");
+  // mobile dropdown mirror of the chips
+  $("#catSelect").innerHTML = cats.map(c=>`<option value="${esc(c)}" ${c===activeCat?"selected":""}>${c==="All"?"All categories":esc(c)}</option>`).join("");
 }
 $("#catChips").addEventListener("click", e=>{
   const b = e.target.closest("[data-cat]"); if(!b) return;
   activeCat = b.dataset.cat; renderCats(); renderGrid();
+});
+$("#catSelect").addEventListener("change", e=>{
+  activeCat = e.target.value; renderCats(); renderGrid();
 });
 function renderGrid(){
   const q = $("#prodSearch").value.trim().toLowerCase();
@@ -551,7 +810,22 @@ function renderCart(){
   const btn = $("#chargeBtn");
   btn.disabled = !cart.length;
   btn.textContent = cart.length ? "CHARGE  " + fmt(t.total) : "CHARGE";
+  // mobile cart bar
+  const n = cart.reduce((s,l)=>s+l.qty, 0);
+  $("#fabCount").textContent = n;
+  $("#fabTotal").textContent = fmt(t.total);
+  $("#cartFab").classList.toggle("show", n>0);
+  if(!n) toggleSheet(false);
 }
+
+/* mobile slide-up order sheet */
+function toggleSheet(open){
+  $("#regRight").classList.toggle("open", !!open);
+  $("#sheetBack").classList.toggle("on", !!open);
+}
+$("#cartFab").addEventListener("click", ()=>toggleSheet(true));
+$("#sheetBack").addEventListener("click", ()=>toggleSheet(false));
+$("#sheetClose").addEventListener("click", ()=>toggleSheet(false));
 $("#cartLines").addEventListener("click", e=>{
   const q = e.target.closest("[data-q]"); if(q){ setQty(q.dataset.pid, +q.dataset.q); return; }
   const r = e.target.closest("[data-rm]"); if(r){ cart = cart.filter(l=>l.pid!==r.dataset.rm); renderCart(); }
@@ -780,7 +1054,7 @@ function showFinalReceipt(s, fresh){
       <button class="btn grn" id="newSale">${fresh?"New sale":"Done"}</button>
     </div>`);
   $("#printRcpt").onclick = ()=>{ $("#printArea").innerHTML = receiptHTML(s); window.print(); };
-  $("#newSale").onclick = ()=>{ closeModal(); if(fresh){ renderCart(); $("#scanInput").focus(); } };
+  $("#newSale").onclick = ()=>{ closeModal(); if(fresh){ renderCart(); focusScan(); } };
 }
 
 /* ---------------- inventory ---------------- */
@@ -1064,15 +1338,87 @@ function confirmModal(title, body, onYes){
   $("#cYes").onclick = ()=>{ closeModal(); onYes(); };
 }
 
+/* ---------------- data & backups (Settings) ---------------- */
+$("#folderBtn").addEventListener("click", async ()=>{
+  if(dirHandle && !(await verifyPerm(dirHandle, false))){
+    if(await verifyPerm(dirHandle, true)){
+      folderWarned = false;
+      await writeFolderFile();
+      toast("POS SYS folder reconnected");
+      updateSaveStatus();
+      return;
+    }
+  }
+  await setupFolder();
+});
+$("#backupNow").addEventListener("click", async ()=>{
+  if(dirHandle && await writeFolderFile()){ toast("Saved to the POS SYS folder"); return; }
+  downloadBackup();
+  toast("Backup downloaded — keep it in your POS SYS folder");
+});
+$("#importBtn").addEventListener("click", ()=>$("#importFile").click());
+$("#importFile").addEventListener("change", e=>{
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ try{ restoreFromObject(JSON.parse(r.result)); }catch(err){ toast("Couldn't read that file as JSON", true); } };
+  r.readAsText(f);
+});
+
+/* ---------------- first-run: create the POS SYS save folder ---------------- */
+function showSetupModal(){
+  openModal(`
+    <div class="mhead"><h3>Enable local saves</h3></div>
+    <div class="mbody">
+      <p style="font-size:13.5px;line-height:1.6;color:var(--mut)">
+        Your products, sales and staff are kept <b style="color:var(--text)">on this device</b> in the app's
+        database (IndexedDB), so they survive closing the app.
+        ${FS_SUPPORTED
+          ? `To keep a permanent copy in your device's storage, the app will create a folder named
+             <b style="color:var(--text)">POS SYS</b> and save its data file (<span style="font-family:var(--mono)">pos-sys-data.json</span>)
+             there automatically after every change. Choose where to create it on the next screen.`
+          : `This browser can't create folders directly, so backups are saved as
+             <b style="color:var(--text)">POS SYS</b> JSON files to your Downloads instead — move them into a folder
+             named <b style="color:var(--text)">POS SYS</b> to keep them together. You can save a backup anytime from Settings.`}
+      </p>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="setupSkip">Not now</button>
+      <button class="btn grn" id="setupGo">${FS_SUPPORTED ? "Create POS SYS folder" : "Save first backup"}</button>
+    </div>`);
+  $("#setupGo").onclick = async ()=>{
+    if(FS_SUPPORTED) await setupFolder(); else downloadBackup();
+    try{ await idbSet("setup-done", 1); }catch(e){}
+    closeModal(); afterSetup();
+  };
+  $("#setupSkip").onclick = async ()=>{
+    try{ await idbSet("setup-done", 1); }catch(e){}
+    closeModal();
+    toast("You can enable local saves anytime from Settings");
+    afterSetup();
+  };
+}
+function afterSetup(){
+  if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
+}
+
 /* ---------------- boot ---------------- */
 function renderAll(){
   renderCats(); renderGrid(); renderCart();
   renderInventory(); renderSales(); renderReports(); renderStaff(); renderSettings();
 }
-loadDB().then(()=>{
-  renderAll(); refreshCashierChip();
-  $("#scanInput").focus();
-  if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
+loadDB().then(async ()=>{
+  await loadDirHandle();
+  renderAll(); refreshCashierChip(); updateSaveStatus();
+  focusScan();
+  let setupDone = null;
+  try{ setupDone = await idbGet("setup-done"); }catch(e){ setupDone = 1; } // no IndexedDB → folder prompt can't persist either
+  if(!setupDone) showSetupModal();
+  else{
+    if(dirHandle && !(await verifyPerm(dirHandle, false)))
+      toast("Tap “Reconnect POS SYS folder” in Settings to resume folder saves", true);
+    afterSetup();
+  }
 });
 })();
 </script>
