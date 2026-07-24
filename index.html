@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="POS SYS">
-<title>LedgerPoint POS</title>
+<meta name="apple-mobile-web-app-title" content="SB POS">
+<title>SB Point of Sale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -297,8 +297,8 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   <!-- ============ SIDEBAR ============ -->
   <aside class="side">
     <div class="brand">
-      <h1>Ledger<span>Point</span></h1>
-      <small>Point of Sale</small>
+      <h1>SB <span>Point of Sale</span></h1>
+      <small>Retail register</small>
     </div>
     <nav class="nav">
       <button data-nav="register" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6a2 2 0 012-2h6a2 2 0 012 2v2M7 13h4"/></svg><span>Register</span></button>
@@ -474,7 +474,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 <script>
 /* =====================================================================
-   LedgerPoint POS — single-file point of sale
+   SB Point of Sale — single-file point of sale
    Persistence, most durable first:
      1. IndexedDB ("POS-SYS" database) — primary on-device store,
         handles large sales histories for long-term use.
@@ -490,23 +490,10 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"Hazard Corner Store", currency:"J$", taxRate:15, footer:"Thank you — walk good!" },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!" },
   seq:1001,
-  employees:[
-    {id:"e1", name:"Rush", role:"Manager", active:true},
-    {id:"e2", name:"Keisha", role:"Cashier", active:true}
-  ],
-  products:[
-    {id:"p1", name:"Bottled Water 500ml", sku:"1001", cat:"Drinks", price:120, cost:60, stock:48, low:12},
-    {id:"p2", name:"Box Juice — Fruit Punch", sku:"1002", cat:"Drinks", price:180, cost:95, stock:30, low:10},
-    {id:"p3", name:"Banana Chips 100g", sku:"2001", cat:"Snacks", price:250, cost:140, stock:24, low:8},
-    {id:"p4", name:"Cheese Crunchies", sku:"2002", cat:"Snacks", price:150, cost:80, stock:40, low:10},
-    {id:"p5", name:"Spice Bun (small)", sku:"3001", cat:"Bakery", price:300, cost:170, stock:15, low:5},
-    {id:"p6", name:"Hard Dough Bread", sku:"3002", cat:"Bakery", price:450, cost:280, stock:10, low:4},
-    {id:"p7", name:"Tin Mackerel", sku:"4001", cat:"Grocery", price:390, cost:240, stock:20, low:6},
-    {id:"p8", name:"Rice 1kg", sku:"4002", cat:"Grocery", price:520, cost:330, stock:18, low:6},
-    {id:"p9", name:"Phone Credit Voucher", sku:"5001", cat:"Services", price:500, cost:470, stock:50, low:10}
-  ],
+  employees:[],
+  products:[],
   sales:[]
 };
 let db = null;                       // {settings, seq, employees, products, sales}
@@ -1322,7 +1309,7 @@ $("#saveSettings").addEventListener("click", ()=>{
   persist(); renderAll(); toast("Settings saved");
 });
 $("#resetData").addEventListener("click", ()=>{
-  confirmModal("Reset everything?", "All products, sales and staff will be replaced with the starter data. This can't be undone.", ()=>{
+  confirmModal("Reset everything?", "All products, sales and staff will be cleared and the system returns to its blank out-of-the-box state. This can't be undone.", ()=>{
     db = JSON.parse(JSON.stringify(DEFAULTS));
     cart=[]; discount={type:null,value:0}; cashierId=null;
     persist(); refreshCashierChip(); renderAll(); toast("System reset");
@@ -1402,6 +1389,55 @@ function afterSetup(){
   if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
 }
 
+/* ---------------- first-run guided tour ---------------- */
+const TOUR_STEPS = [
+  { nav:"register", title:"Welcome to SB Point of Sale", body:"Here's a quick tour of how the system works — about a minute. It only shows once, and you can skip it at any time." },
+  { nav:"register", title:"1 · Register", body:"This is where you ring up sales. Scan a barcode or tap a product to add it to the receipt, adjust quantities, then press <b>Charge</b> to take cash, card or mobile payment." },
+  { nav:"inventory", title:"2 · Inventory", body:"Your product library lives here. Add items with a price, cost, barcode and stock level. Stock counts down automatically with every sale, and you'll see low-stock alerts." },
+  { nav:"sales", title:"3 · Sales log", body:"Every completed transaction is recorded here — who rang it up and how it was paid. You can reprint any receipt or export everything to CSV." },
+  { nav:"reports", title:"4 · Reports", body:"See how the business is doing: revenue, top sellers, sales by staff, payment mix and category breakdowns across any date range." },
+  { nav:"staff", title:"5 · Staff", body:"Add the people who work the register. Each sale is logged against the cashier signed in, so you can track sales per person." },
+  { nav:"settings", title:"6 · Settings", body:"Set your store name, currency, tax rate and receipt message here, and back up or restore your data. A good place to start is adding your store details." },
+  { nav:"register", title:"You're all set", body:"That's the whole system. Add your staff and products from the menu whenever you're ready — your first sale is just a tap away." }
+];
+function goToView(name){
+  const b = document.querySelector('.side [data-nav="'+name+'"]');
+  if(b) b.click();
+}
+function startTour(onDone){
+  let i = 0, done = false;
+  const finish = ()=>{
+    if(done) return; done = true;
+    try{ idbSet("tour-done", 1); }catch(e){}
+    closeModal(); goToView("register");
+    if(onDone) onDone();
+  };
+  function render(){
+    const s = TOUR_STEPS[i], last = i === TOUR_STEPS.length - 1;
+    goToView(s.nav);
+    const dots = TOUR_STEPS.map((_,k)=>`<span style="width:7px;height:7px;border-radius:50%;background:${k===i?'var(--grn)':'var(--line)'}"></span>`).join("");
+    openModal(`
+      <div class="mhead"><h3>${s.title}</h3>
+        <button id="tourX" title="Skip tour" style="color:var(--mut);font-size:22px;line-height:1;padding:4px;background:none;border:none;cursor:pointer">×</button></div>
+      <div class="mbody">
+        <p style="font-size:14px;line-height:1.65;color:var(--mut)">${s.body}</p>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:20px">${dots}</div>
+      </div>
+      <div class="mfoot" style="justify-content:space-between">
+        <button class="btn" id="tourSkip">Skip tour</button>
+        <div style="display:flex;gap:10px">
+          ${i>0?'<button class="btn" id="tourBack">Back</button>':''}
+          <button class="btn grn" id="tourNext">${last?"Get started":"Next"}</button>
+        </div>
+      </div>`);
+    $("#tourNext").onclick = ()=>{ if(last) finish(); else { i++; render(); } };
+    $("#tourSkip").onclick = finish;
+    $("#tourX").onclick = finish;
+    const back = $("#tourBack"); if(back) back.onclick = ()=>{ i--; render(); };
+  }
+  render();
+}
+
 /* ---------------- boot ---------------- */
 function renderAll(){
   renderCats(); renderGrid(); renderCart();
@@ -1411,14 +1447,17 @@ loadDB().then(async ()=>{
   await loadDirHandle();
   renderAll(); refreshCashierChip(); updateSaveStatus();
   focusScan();
-  let setupDone = null;
+  let setupDone = null, tourDone = null;
   try{ setupDone = await idbGet("setup-done"); }catch(e){ setupDone = 1; } // no IndexedDB → folder prompt can't persist either
-  if(!setupDone) showSetupModal();
-  else{
+  try{ tourDone = await idbGet("tour-done"); }catch(e){ tourDone = 1; }    // can't persist "seen" flag → don't nag every launch
+  async function runSetup(){
+    if(!setupDone){ showSetupModal(); return; }
     if(dirHandle && !(await verifyPerm(dirHandle, false)))
       toast("Tap “Reconnect POS SYS folder” in Settings to resume folder saves", true);
     afterSetup();
   }
+  if(!tourDone) startTour(()=>runSetup());
+  else runSetup();
 });
 })();
 </script>
