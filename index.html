@@ -436,9 +436,19 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
           <div class="field"><label>Tax rate (%)</label><input id="setTax" type="number" min="0" max="60" step="0.5"></div>
         </div>
         <div class="field"><label>Receipt footer message</label><input id="setFoot"></div>
+        <div class="field"><label>Receipt paper width</label>
+          <select id="setPaper"><option value="32">58 mm (32 characters)</option><option value="48">80 mm (48 characters)</option></select></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
           <button class="btn red sm" id="resetData">Reset all data</button>
           <button class="btn grn" id="saveSettings">Save settings</button>
+        </div>
+      </div>
+      <div class="card" style="max-width:520px;padding:20px;margin-top:14px">
+        <h3 style="border:none;padding:0 0 4px">Bluetooth receipt printer</h3>
+        <p id="btStatus" style="color:var(--mut);font-size:13px;line-height:1.6;margin-bottom:14px"></p>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn grn" id="btConnectBtn">Connect printer</button>
+          <button class="btn" id="btTestBtn">Print test receipt</button>
         </div>
       </div>
       <div class="card" style="max-width:520px;padding:20px;margin-top:14px">
@@ -490,7 +500,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!" },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32 },
   seq:1001,
   employees:[],
   products:[],
@@ -705,7 +715,7 @@ document.querySelectorAll("[data-nav]").forEach(b=>{
     toggleSheet(false);
     renderAll();
     if(b.dataset.nav==="register") focusScan();
-    if(b.dataset.nav==="settings") updateSaveStatus();
+    if(b.dataset.nav==="settings"){ updateSaveStatus(); updatePrinterStatus(); }
   });
 });
 
@@ -1036,12 +1046,158 @@ function showFinalReceipt(s, fresh){
       ${fresh?`<div class="approved">✓</div>`:""}
       <div class="final-receipt">${receiptHTML(s)}</div>
     </div>
-    <div class="mfoot">
+    <div class="mfoot" style="flex-wrap:wrap">
+      ${BT_SUPPORTED?`<button class="btn" id="btPrintRcpt">🖨 Bluetooth print</button>`:""}
       <button class="btn" id="printRcpt">Print receipt</button>
       <button class="btn grn" id="newSale">${fresh?"New sale":"Done"}</button>
     </div>`);
   $("#printRcpt").onclick = ()=>{ $("#printArea").innerHTML = receiptHTML(s); window.print(); };
+  const btp = $("#btPrintRcpt"); if(btp) btp.onclick = ()=>printViaBluetooth(s);
   $("#newSale").onclick = ()=>{ closeModal(); if(fresh){ renderCart(); focusScan(); } };
+}
+
+/* ---------------- Bluetooth thermal printer (Web Bluetooth + ESC/POS) ----------------
+   Talks directly to common BLE receipt printers (58mm/80mm ESC/POS, e.g. the
+   generic "Bluetooth thermal receipt printer" units on Amazon). Chrome/Edge on
+   Android, Windows, macOS and ChromeOS support Web Bluetooth; iOS/iPadOS Safari
+   does not — those fall back to the system "Print receipt" dialog. */
+const BT_SUPPORTED = !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
+/* Services these printers commonly expose; must be declared to access them. */
+const PRINTER_SERVICES = [
+  0x18f0, 0xff00, 0xffe0, 0xff80, 0xffb0, 0xfee0, 0xfff0, 0xae30,
+  "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+  "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
+];
+let btDevice = null, btChar = null;
+function btConnected(){ return !!(btChar && btDevice && btDevice.gatt && btDevice.gatt.connected); }
+function paperCols(){ return db.settings.paper===48 ? 48 : 32; }
+
+/* pick the first writable characteristic across the printer's services */
+async function btFindWritable(server){
+  const svcs = await server.getPrimaryServices();
+  for(const s of svcs){
+    let chars;
+    try{ chars = await s.getCharacteristics(); }catch(e){ continue; }
+    const w = chars.find(c=>c.properties.writeWithoutResponse) || chars.find(c=>c.properties.write);
+    if(w) return w;
+  }
+  return null;
+}
+async function btConnect(){
+  if(!BT_SUPPORTED){ toast("This browser can't use Bluetooth — use “Print receipt” instead", true); return false; }
+  try{
+    if(!btDevice){
+      btDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:PRINTER_SERVICES });
+      btDevice.addEventListener("gattserverdisconnected", ()=>{ btChar=null; updatePrinterStatus(); });
+    }
+    const server = await btDevice.gatt.connect();
+    btChar = await btFindWritable(server);
+    if(!btChar){ toast("Connected, but no printable channel was found on that device", true); updatePrinterStatus(); return false; }
+    toast("Printer connected: " + (btDevice.name||"Bluetooth printer"));
+    updatePrinterStatus();
+    return true;
+  }catch(e){
+    if(e && e.name !== "NotFoundError") toast("Couldn't connect: " + (e.message||e.name), true);
+    updatePrinterStatus();
+    return false;
+  }
+}
+function btDisconnect(){
+  try{ if(btDevice && btDevice.gatt && btDevice.gatt.connected) btDevice.gatt.disconnect(); }catch(e){}
+  btChar = null; btDevice = null; updatePrinterStatus();
+}
+/* write in small chunks so we don't overrun the printer's BLE buffer */
+async function btWrite(bytes){
+  const chunk = 128, sleep = ms=>new Promise(r=>setTimeout(r,ms));
+  const write = btChar.properties.writeWithoutResponse && btChar.writeValueWithoutResponse
+    ? b=>btChar.writeValueWithoutResponse(b) : b=>btChar.writeValue(b);
+  for(let i=0;i<bytes.length;i+=chunk){
+    await write(bytes.slice(i, i+chunk));
+    await sleep(18);
+  }
+}
+
+/* ---- ESC/POS receipt builder ---- */
+const ESC = {
+  init:[0x1B,0x40], left:[0x1B,0x61,0], center:[0x1B,0x61,1],
+  boldOn:[0x1B,0x45,1], boldOff:[0x1B,0x45,0],
+  big:[0x1D,0x21,0x11], normal:[0x1D,0x21,0x00],
+  cut:[0x1D,0x56,0x42,0x00]
+};
+function encLine(str){
+  // normalise a few common non-ASCII glyphs, then map to single-byte codes
+  str = String(str).replace(/[—–]/g,"-").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[×]/g,"x").replace(/[·]/g,"-");
+  const out = [];
+  for(const ch of str){ const c = ch.codePointAt(0); out.push(c<256?c:0x3F); }
+  out.push(0x0A);
+  return out;
+}
+function lineLR(l, r, cols){
+  l = String(l); r = String(r);
+  const room = cols - r.length - 1;
+  if(l.length > room) l = l.slice(0, Math.max(0,room));
+  const gap = Math.max(1, cols - l.length - r.length);
+  return l + " ".repeat(gap) + r;
+}
+function buildReceiptBytes(s){
+  const st = db.settings, cols = paperCols(), rule = "-".repeat(cols);
+  const methodName = {cash:"CASH", card:"CARD", wallet:"MOBILE WALLET"}[s.method]||s.method;
+  let b = [];
+  const push = (...a)=>a.forEach(x=>Array.isArray(x)?b.push(...x):b.push(x));
+  push(ESC.init, ESC.center);
+  if((st.store||"").trim()){ push(ESC.big, ESC.boldOn, encLine(st.store), ESC.normal, ESC.boldOff); }
+  push(encLine(new Date(s.ts).toLocaleString()));
+  push(encLine("Receipt " + s.id), encLine("Cashier: " + s.empName));
+  push(ESC.left, encLine(rule));
+  s.lines.forEach(l=>{
+    push(encLine(lineLR(l.name, fmt(l.price*l.qty), cols)));
+    push(encLine("  " + l.qty + " x " + fmt(l.price) + (l.sku ? "  SKU " + l.sku : "")));
+  });
+  push(encLine(rule));
+  push(encLine(lineLR("Subtotal", fmt(s.sub), cols)));
+  if(s.disc>0) push(encLine(lineLR("Discount", "-"+fmt(s.disc), cols)));
+  push(encLine(lineLR("Tax ("+st.taxRate+"%)", fmt(s.tax), cols)));
+  push(ESC.boldOn, encLine(lineLR("TOTAL", fmt(s.total), cols)), ESC.boldOff);
+  push(encLine(rule));
+  push(encLine(lineLR("Paid - "+methodName, fmt(s.method==="cash"?s.tender:s.total), cols)));
+  if(s.method==="cash") push(encLine(lineLR("Change", fmt(s.change), cols)));
+  if(s.auth) push(encLine(lineLR("Approval", s.auth, cols)));
+  if((st.footer||"").trim()){ push(encLine(rule), ESC.center, encLine(st.footer), ESC.left); }
+  push([0x1B,0x64,0x03], ESC.cut);   // feed 3 lines, then cut (ignored by printers without a cutter)
+  return new Uint8Array(b);
+}
+async function printViaBluetooth(s){
+  if(!BT_SUPPORTED){ toast("Bluetooth printing isn't available in this browser", true); return; }
+  if(!btConnected() && !(await btConnect())) return;
+  try{
+    toast("Printing…");
+    await btWrite(buildReceiptBytes(s));
+    toast("Sent to printer");
+  }catch(e){
+    btChar = null;
+    toast("Print failed: " + (e.message||e.name) + " — reconnect the printer", true);
+    updatePrinterStatus();
+  }
+}
+async function printTestReceipt(){
+  const sample = {
+    id:"R-TEST", ts:Date.now(), empName: emp(cashierId)?emp(cashierId).name:"—",
+    lines:[{name:"Test item", sku:"0000", price:100, qty:1}],
+    sub:100, disc:0, tax:100*(db.settings.taxRate/100), total:100*(1+db.settings.taxRate/100),
+    method:"cash", tender:200, change:200-100*(1+db.settings.taxRate/100), auth:null
+  };
+  await printViaBluetooth(sample);
+}
+function updatePrinterStatus(){
+  const el = document.getElementById("btStatus"); if(!el) return;
+  let msg;
+  if(!BT_SUPPORTED) msg = "Web Bluetooth isn't supported by this browser (e.g. iPhone/iPad Safari). Receipts can still be printed with the system “Print receipt” button on each receipt.";
+  else if(btConnected()) msg = "Connected to <b style=\"color:var(--text)\">"+esc(btDevice.name||"Bluetooth printer")+"</b> — receipts can print straight to it.";
+  else msg = "No printer connected. Tap “Connect printer”, then pick your Bluetooth receipt printer (pair it in your device's Bluetooth settings first).";
+  el.innerHTML = msg;
+  const cbtn = document.getElementById("btConnectBtn");
+  if(cbtn){ cbtn.textContent = btConnected() ? "Disconnect printer" : "Connect printer"; cbtn.disabled = !BT_SUPPORTED; }
+  const tbtn = document.getElementById("btTestBtn"); if(tbtn) tbtn.disabled = !BT_SUPPORTED;
 }
 
 /* ---------------- inventory ---------------- */
@@ -1300,14 +1456,18 @@ function renderSettings(){
   $("#setCur").value = db.settings.currency;
   $("#setTax").value = db.settings.taxRate;
   $("#setFoot").value = db.settings.footer;
+  $("#setPaper").value = String(db.settings.paper===48 ? 48 : 32);
 }
 $("#saveSettings").addEventListener("click", ()=>{
   db.settings.store = $("#setStore").value.trim() || "My Store";
   db.settings.currency = $("#setCur").value.trim() || "$";
   db.settings.taxRate = Math.max(0, parseFloat($("#setTax").value)||0);
   db.settings.footer = $("#setFoot").value.trim();
+  db.settings.paper = parseInt($("#setPaper").value)===48 ? 48 : 32;
   persist(); renderAll(); toast("Settings saved");
 });
+$("#btConnectBtn").addEventListener("click", ()=>{ btConnected() ? btDisconnect() : btConnect(); });
+$("#btTestBtn").addEventListener("click", printTestReceipt);
 $("#resetData").addEventListener("click", ()=>{
   confirmModal("Reset everything?", "All products, sales and staff will be cleared and the system returns to its blank out-of-the-box state. This can't be undone.", ()=>{
     db = JSON.parse(JSON.stringify(DEFAULTS));
@@ -1397,7 +1557,7 @@ const TOUR_STEPS = [
   { nav:"sales", title:"3 · Sales log", body:"Every completed transaction is recorded here — who rang it up and how it was paid. You can reprint any receipt or export everything to CSV." },
   { nav:"reports", title:"4 · Reports", body:"See how the business is doing: revenue, top sellers, sales by staff, payment mix and category breakdowns across any date range." },
   { nav:"staff", title:"5 · Staff", body:"Add the people who work the register. Each sale is logged against the cashier signed in, so you can track sales per person." },
-  { nav:"settings", title:"6 · Settings", body:"Set your store name, currency, tax rate and receipt message here, and back up or restore your data. A good place to start is adding your store details." },
+  { nav:"settings", title:"6 · Settings", body:"Set your store name, currency, tax rate and receipt message, connect a Bluetooth receipt printer, and back up or restore your data. A good place to start is adding your store details." },
   { nav:"register", title:"You're all set", body:"That's the whole system. Add your staff and products from the menu whenever you're ready — your first sale is just a tap away." }
 ];
 function goToView(name){
@@ -1445,7 +1605,7 @@ function renderAll(){
 }
 loadDB().then(async ()=>{
   await loadDirHandle();
-  renderAll(); refreshCashierChip(); updateSaveStatus();
+  renderAll(); refreshCashierChip(); updateSaveStatus(); updatePrinterStatus();
   focusScan();
   let setupDone = null, tourDone = null;
   try{ setupDone = await idbGet("setup-done"); }catch(e){ setupDone = 1; } // no IndexedDB → folder prompt can't persist either
