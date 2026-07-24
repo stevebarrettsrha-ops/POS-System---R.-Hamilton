@@ -230,6 +230,15 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none}
 #tourCard.on{display:block;animation:popIn .24s cubic-bezier(.25,.9,.35,1.15)}
 
+/* ---------- older-browser fallback screen ---------- */
+#compat-fallback{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9999;background:#141A23;color:#E9EDF2;align-items:center;justify-content:center;padding:24px;font-family:'Archivo',system-ui,sans-serif;text-align:center}
+#compat-fallback .cf-box{max-width:460px}
+#compat-fallback .cf-logo{font-weight:800;font-size:23px;margin-bottom:20px;letter-spacing:-.3px}
+#compat-fallback .cf-logo span{color:#2FA57B}
+#compat-fallback h2{font-size:20px;margin-bottom:14px}
+#compat-fallback p{color:#8C97A7;line-height:1.65;margin-bottom:14px;font-size:15px}
+#compat-fallback .cf-note{font-size:13px;color:#6E7A8A}
+
 /* ---------- category dropdown (mobile) ---------- */
 .catselect{display:none;margin-bottom:12px}
 
@@ -521,6 +530,43 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 <div id="tourCard"></div>
 <div id="printArea"></div>
 
+<!-- Fallback shown only when the browser is too old to run the modern app -->
+<div id="compat-fallback">
+  <div class="cf-box">
+    <div class="cf-logo">SB <span>Point of Sale</span></div>
+    <h2>Your browser needs an update</h2>
+    <p>SB Point of Sale uses modern web features that this device's browser doesn't support yet. Any data you've saved is still safe on this device.</p>
+    <p>To run it on this tablet, please update <b>Chrome</b> or <b>Samsung Internet</b> from the Play Store — or open the app in an up-to-date browser.</p>
+    <p class="cf-note">Recommended: Chrome 80+ or Samsung Internet 13+.</p>
+  </div>
+</div>
+<noscript><div style="position:fixed;inset:0;background:#141A23;color:#E9EDF2;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:sans-serif">Please enable JavaScript to use SB Point of Sale.</div></noscript>
+
+<!-- ES5-only capability gate: runs before the modern app; on browsers too old
+     to parse/run it, shows the fallback screen instead of a broken UI. -->
+<script>
+(function(){
+  "use strict";
+  var ok = true;
+  try {
+    // Compile (not run) the core syntax the app needs: arrow + async + const + template literals.
+    // On an old engine this throws SyntaxError, which we catch here in plain ES5.
+    new Function("var f = async function(){ const s = `x`; return (function(a){ return a; })(s); };");
+  } catch (e) { ok = false; }
+  if (ok && (!window.Promise || !window.Map || !window.Set || typeof Object.assign !== "function" || !window.Symbol)) ok = false;
+  if (!ok) {
+    window.__POS_UNSUPPORTED__ = true;
+    var reveal = function(){
+      var app = document.querySelector(".app"); if (app) app.style.display = "none";
+      var nav = document.querySelector(".bottom-nav"); if (nav) nav.style.display = "none";
+      var fb = document.getElementById("compat-fallback"); if (fb) fb.style.display = "flex";
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", reveal);
+    else reveal();
+  }
+})();
+</script>
+
 <script>
 /* =====================================================================
    SB Point of Sale — single-file point of sale
@@ -536,6 +582,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 ===================================================================== */
 (function(){
 "use strict";
+if(window.__POS_UNSUPPORTED__) return;   // older-browser fallback screen is showing instead
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
