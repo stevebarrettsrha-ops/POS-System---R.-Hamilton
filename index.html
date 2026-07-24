@@ -237,7 +237,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
 /* ---------- bottom navigation (mobile) ---------- */
-.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(20,26,35,.97);backdrop-filter:blur(12px);border-top:1px solid var(--line);grid-template-columns:repeat(6,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(20,26,35,.97);backdrop-filter:blur(12px);border-top:1px solid var(--line);grid-template-columns:repeat(7,1fr);gap:2px;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
 .bottom-nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border-radius:9px;color:var(--mut);font-size:10px;font-weight:700;letter-spacing:.2px}
 .bottom-nav button svg{width:20px;height:20px}
 .bottom-nav button.on{color:var(--grn);background:rgba(47,165,123,.1)}
@@ -317,6 +317,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
       <button data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span>Sales log</span></button>
       <button data-nav="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Reports</span></button>
       <button data-nav="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 010 6.4M18 14.7c2 .8 3.2 2.6 3.7 5.3"/></svg><span>Staff</span></button>
+      <button data-nav="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg><span>Admin</span></button>
       <button data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4.1 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4.1h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114.1 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.2a2 2 0 110 4.1h-.2a1.7 1.7 0 00-1.5 1z"/></svg><span>Settings</span></button>
     </nav>
     <div class="side-foot">
@@ -488,6 +489,15 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </div>
     </section>
+
+    <!-- ADMIN -->
+    <section class="view" id="view-admin">
+      <div class="vhead">
+        <div><h2>Admin</h2><p>Handle password-reset requests and reset staff passwords. Admin access only.</p></div>
+        <button class="btn" id="adminLock">Return to sign-in</button>
+      </div>
+      <div id="adminBody"></div>
+    </section>
   </main>
 </div>
 
@@ -498,6 +508,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   <button data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Sales</button>
   <button data-nav="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
   <button data-nav="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 010 6.4M18 14.7c2 .8 3.2 2.6 3.7 5.3"/></svg>Staff</button>
+  <button data-nav="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>Admin</button>
   <button data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4.1 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4.1h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114.1 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.2a2 2 0 110 4.1h-.2a1.7 1.7 0 00-1.5 1z"/></svg>Settings</button>
 </nav>
 
@@ -528,11 +539,12 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, cut:"auto", charset:"ascii", printerId:"" },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, cut:"auto", charset:"ascii", printerId:"", adminPass:"", adminSalt:"" },
   seq:1001,
   employees:[],
   products:[],
-  sales:[]
+  sales:[],
+  resetRequests:[]   // pending "forgot password" requests for the admin to action
 };
 let db = null;                       // {settings, seq, employees, products, sales}
 let cart = [];                       // [{pid, name, price, qty}]
@@ -541,6 +553,8 @@ let cashierId = null;
 let activeCat = "All";
 let repRange = "today";
 let payState = null;                 // transient payment modal state
+let signinLock = false;              // true while the register is locked awaiting sign-in
+let adminUnlocked = false;           // true once the admin password has been entered this session
 let storageOK = false;
 
 /* ---------------- persistence: IndexedDB (primary store) ---------------- */
@@ -599,6 +613,7 @@ async function loadDB(){
 function migrate(){
   db.settings = Object.assign({}, DEFAULTS.settings, db.settings||{});
   db.products = db.products||[]; db.sales = db.sales||[]; db.employees = db.employees||[];
+  db.resetRequests = db.resetRequests||[];
   if(!db.seq) db.seq = 1001;
 }
 let saveTimer = null;
@@ -689,6 +704,7 @@ function restoreFromObject(obj){
     cart = []; discount = {type:null, value:0}; cashierId = null;
     persist(); refreshCashierChip(); renderAll();
     toast("Backup restored");
+    requireSignIn();
   });
 }
 async function updateSaveStatus(){
@@ -735,15 +751,22 @@ function totals(){
 /* ---------------- navigation (sidebar + mobile bottom nav stay in sync) ---------------- */
 const isMobile = ()=>window.matchMedia("(max-width:740px)").matches;
 function focusScan(){ if(!isMobile()) $("#scanInput").focus(); } // no keyboard pop-up on phones
+function activateView(name){
+  document.querySelectorAll("[data-nav]").forEach(x=>x.classList.toggle("on", x.dataset.nav===name));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+  $("#view-"+name).classList.add("on");
+  toggleSheet(false);
+  renderAll();
+  if(name==="register") focusScan();
+  if(name==="settings"){ updateSaveStatus(); updatePrinterStatus(); }
+  if(name==="admin") renderAdmin($("#adminBody"));
+}
 document.querySelectorAll("[data-nav]").forEach(b=>{
   b.addEventListener("click", ()=>{
-    document.querySelectorAll("[data-nav]").forEach(x=>x.classList.toggle("on", x.dataset.nav===b.dataset.nav));
-    document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
-    $("#view-"+b.dataset.nav).classList.add("on");
-    toggleSheet(false);
-    renderAll();
-    if(b.dataset.nav==="register") focusScan();
-    if(b.dataset.nav==="settings"){ updateSaveStatus(); updatePrinterStatus(); }
+    const name = b.dataset.nav;
+    // Admin is password-protected — gate it behind the admin password once per session
+    if(name==="admin" && !adminUnlocked){ adminGate(()=>{ closeModal(); activateView("admin"); }); return; }
+    activateView(name);
   });
 });
 
@@ -783,6 +806,7 @@ $("#prodGrid").addEventListener("click", e=>{
 });
 
 function addToCart(pid){
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   const p = db.products.find(x=>x.id===pid); if(!p) return;
   const line = cart.find(l=>l.pid===pid);
   const inCart = line ? line.qty : 0;
@@ -863,6 +887,7 @@ $("#clearCart").addEventListener("click", ()=>{
 /* barcode / SKU entry */
 $("#scanInput").addEventListener("keydown", e=>{
   if(e.key!=="Enter") return;
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   const code = e.target.value.trim(); if(!code) return;
   const p = db.products.find(x=>String(x.sku).toLowerCase()===code.toLowerCase());
   if(p){ addToCart(p.id); e.target.value=""; }
@@ -876,9 +901,10 @@ function openModal(html, wide){
   $("#ovl").classList.add("on");
 }
 function closeModal(){ $("#ovl").classList.remove("on"); payState=null; }
-$("#ovl").addEventListener("click", e=>{ if(e.target.id==="ovl" && !(payState&&payState.busy)) closeModal(); });
-document.addEventListener("click", e=>{ if(e.target.closest(".mclose")) closeModal(); });
-document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !(payState&&payState.busy)) closeModal(); });
+/* while the register is locked awaiting sign-in, the modal can't be dismissed */
+$("#ovl").addEventListener("click", e=>{ if(e.target.id==="ovl" && !signinLock && !(payState&&payState.busy)) closeModal(); });
+document.addEventListener("click", e=>{ if(e.target.closest(".mclose") && !signinLock) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !signinLock && !(payState&&payState.busy)) closeModal(); });
 
 /* ---------------- discount modal ---------------- */
 $("#discBtn").addEventListener("click", ()=>{
@@ -938,19 +964,21 @@ async function verifyPassword(e, pw){
   return (await hashPass(pw, e.salt)) === e.pass;
 }
 function finalizeSignIn(e){
+  signinLock = false;
   cashierId = e.id; refreshCashierChip(); renderCart(); renderStaff(); closeModal();
   toast(e.name + " signed in");
 }
 function promptLogin(id){
   const e = emp(id); if(!e) return;
   if(!e.pass) return promptChangePassword(e, true); // no password yet (e.g. legacy data) → set one now
+  const locked = signinLock;
   openModal(`
-    <div class="mhead"><h3>Sign in — ${esc(e.name)}</h3><button class="mclose">×</button></div>
+    <div class="mhead"><h3>Sign in — ${esc(e.name)}</h3>${locked?"":'<button class="mclose">×</button>'}</div>
     <div class="mbody">
       <div class="field"><label>Password</label><input id="logPass" type="password" autocomplete="off"></div>
       <p style="color:var(--mut);font-size:12.5px">Enter your password to sign in to the register.</p>
     </div>
-    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="logGo">Sign in</button></div>`);
+    <div class="mfoot"><button class="btn" id="logCancel">${locked?"Back":"Cancel"}</button><button class="btn grn" id="logGo">Sign in</button></div>`);
   const inp = $("#logPass"); inp.focus();
   const go = async ()=>{
     const pw = inp.value;
@@ -961,6 +989,7 @@ function promptLogin(id){
     }else{ toast("Incorrect password", true); inp.value = ""; inp.focus(); }
   };
   $("#logGo").onclick = go;
+  $("#logCancel").onclick = ()=>{ if(locked) pickCashier(true); else closeModal(); };
   inp.addEventListener("keydown", ev=>{ if(ev.key==="Enter") go(); });
 }
 function promptChangePassword(e, firstTime){
@@ -1012,16 +1041,33 @@ function pickCashier(force){
         <button data-emp="${e.id}"><span class="avatar">${esc(e.name[0]||"?")}</span>
         <span>${esc(e.name)}<br><small style="color:var(--mut);font-weight:400">${esc(e.role||"Cashier")}</small></span></button>`).join("")}</div>`
       : `<div class="empty"><b>No active staff</b>Add a staff member first.</div>`}
+    </div>
+    <div class="mfoot" style="justify-content:space-between">
+      <button class="btn" id="forgotBtn">Forgot password?</button>
+      <button class="btn" id="adminBtn">Admin</button>
     </div>`);
   $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>promptLogin(b.dataset.emp));
+  $("#forgotBtn").onclick = forgotPasswordFlow;
+  $("#adminBtn").onclick = ()=>adminGate(()=>{ signinLock = false; closeModal(); activateView("admin"); });
 }
-$("#cashierChip").addEventListener("click", ()=>pickCashier(false));
+$("#cashierChip").addEventListener("click", ()=>{ if(!signinLock) pickCashier(false); });
+function cashierSignedIn(){ const c = emp(cashierId); return !!(c && c.active); }
+/* Lock the register behind the sign-in prompt whenever no cashier is signed in
+   and there is at least one active staff member who could sign in. (With no
+   active staff yet — e.g. a brand-new setup — it stays open so staff can be added.) */
+function requireSignIn(){
+  if(cashierSignedIn()){ signinLock = false; return; }
+  if(!db.employees.some(e=>e.active)){ signinLock = false; return; }
+  signinLock = true;
+  pickCashier(true);
+}
 function signOut(){
   if(!cashierId) return;
   const name = emp(cashierId) ? emp(cashierId).name : "Cashier";
   cashierId = null;
   refreshCashierChip(); renderCart(); renderStaff();
   toast(name + " signed out");
+  requireSignIn();   // re-lock: show "Who's on the register?" until someone signs in
 }
 $("#signOutBtn").addEventListener("click", signOut);
 function refreshCashierChip(){
@@ -1031,10 +1077,137 @@ function refreshCashierChip(){
   const so = $("#signOutBtn"); if(so) so.style.display = c ? "inline-flex" : "none";
 }
 
+/* ---------------- forgot password (from the sign-in screen) ---------------- */
+function forgotPasswordFlow(){
+  const active = db.employees.filter(e=>e.active);
+  openModal(`
+    <div class="mhead"><h3>Forgot password</h3>${signinLock?"":'<button class="mclose">×</button>'}</div>
+    <div class="mbody">
+      <p style="color:var(--mut);font-size:13px;line-height:1.55;margin-bottom:12px">Select your name to send a password-reset request to the admin. The admin will reset it and give you a new temporary password.</p>
+      ${active.length ? `<div class="staff-pick">${active.map(e=>`
+        <button data-forgot="${e.id}"><span class="avatar">${esc(e.name[0]||"?")}</span>
+        <span>${esc(e.name)}<br><small style="color:var(--mut);font-weight:400">${esc(e.role||"Cashier")}</small></span></button>`).join("")}</div>`
+      : `<div class="empty"><b>No staff</b>Ask your admin to add you first.</div>`}
+    </div>
+    <div class="mfoot"><button class="btn" id="forgotBack">Back</button></div>`);
+  $("#forgotBack").onclick = ()=>pickCashier(signinLock);
+  $("#modalBox").querySelectorAll("[data-forgot]").forEach(b=>b.onclick = ()=>{
+    const id = b.dataset.forgot, e = emp(id);
+    db.resetRequests = db.resetRequests || [];
+    if(!db.resetRequests.some(r=>r.empId===id)){
+      db.resetRequests.push({ id:uid("req"), empId:id, name:e?e.name:"", ts:Date.now() });
+      persist();
+    }
+    toast("Reset request sent to admin");
+    pickCashier(signinLock);
+  });
+}
+
+/* ---------------- admin (password-protected) ---------------- */
+async function ensureAdminPassword(){
+  if(!db.settings.adminPass || !db.settings.adminSalt){
+    db.settings.adminSalt = genSalt();
+    db.settings.adminPass = await hashPass("134679", db.settings.adminSalt); // default admin password
+    persist();
+  }
+}
+async function verifyAdmin(pw){
+  if(!db.settings.adminPass || !db.settings.adminSalt) return pw === "134679";
+  return (await hashPass(pw, db.settings.adminSalt)) === db.settings.adminPass;
+}
+async function setAdminPassword(pw){
+  db.settings.adminSalt = genSalt();
+  db.settings.adminPass = await hashPass(pw, db.settings.adminSalt);
+  persist();
+}
+function adminGate(onOk){
+  if(adminUnlocked){ onOk(); return; }
+  openModal(`
+    <div class="mhead"><h3>Admin sign-in</h3>${signinLock?"":'<button class="mclose">×</button>'}</div>
+    <div class="mbody">
+      <div class="field"><label>Admin password</label><input id="admPass" type="password" autocomplete="off"></div>
+      <p style="color:var(--mut);font-size:12.5px">Enter the admin password to manage password resets.</p>
+    </div>
+    <div class="mfoot"><button class="btn" id="admCancel">${signinLock?"Back":"Cancel"}</button><button class="btn grn" id="admGo">Enter</button></div>`);
+  const inp = $("#admPass"); inp.focus();
+  const go = async ()=>{
+    if(await verifyAdmin(inp.value)){ adminUnlocked = true; onOk(); }
+    else{ toast("Wrong admin password", true); inp.value = ""; inp.focus(); }
+  };
+  $("#admGo").onclick = go;
+  $("#admCancel").onclick = ()=>{ if(signinLock) pickCashier(true); else closeModal(); };
+  inp.addEventListener("keydown", ev=>{ if(ev.key==="Enter") go(); });
+}
+function renderAdmin(container){
+  if(!container) return;
+  const reqs = db.resetRequests || [];
+  const reqRow = r=>{
+    const e = emp(r.empId);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:var(--ink3);border:1px solid var(--line);border-radius:10px">
+      <div><b>${esc(e?e.name:(r.name||"Unknown"))}</b><br><small style="color:var(--mut)">requested ${new Date(r.ts).toLocaleString()}</small></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${e?`<button class="btn sm grn" data-areq="${r.id}">Reset password</button>`:""}
+        <button class="btn sm" data-adismiss="${r.id}">Dismiss</button>
+      </div></div>`;
+  };
+  const staffRow = e=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:var(--ink3);border:1px solid var(--line);border-radius:10px">
+      <div><b>${esc(e.name)}</b> <small style="color:var(--mut)">${esc(e.role||"Cashier")}</small>${e.mustChange?' <span class="badge low">temp password</span>':""}</div>
+      <button class="btn sm" data-astaff="${e.id}">Reset password</button>
+    </div>`;
+  container.innerHTML = `
+    <div class="card" style="max-width:600px;padding:20px">
+      <h3 style="border:none;padding:0 0 12px">Password reset requests${reqs.length?` <span class="badge low">${reqs.length}</span>`:""}</h3>
+      ${reqs.length ? `<div style="display:flex;flex-direction:column;gap:8px">${reqs.map(reqRow).join("")}</div>`
+        : `<p style="color:var(--mut);font-size:13px">No pending requests. When a cashier taps “Forgot password?” on the sign-in screen, it appears here.</p>`}
+    </div>
+    <div class="card" style="max-width:600px;padding:20px;margin-top:14px">
+      <h3 style="border:none;padding:0 0 12px">All staff — reset password</h3>
+      ${db.employees.length ? `<div style="display:flex;flex-direction:column;gap:8px">${db.employees.map(staffRow).join("")}</div>`
+        : `<p style="color:var(--mut);font-size:13px">No staff yet. Add staff from the Staff page.</p>`}
+    </div>
+    <div class="card" style="max-width:600px;padding:20px;margin-top:14px">
+      <h3 style="border:none;padding:0 0 12px">Admin password</h3>
+      <div class="frow">
+        <div class="field"><label>New admin password</label><input id="admNew" type="password" autocomplete="new-password"></div>
+        <div class="field"><label>Confirm</label><input id="admNew2" type="password" autocomplete="new-password"></div>
+      </div>
+      <div style="text-align:right"><button class="btn grn" id="admChange">Change admin password</button></div>
+    </div>`;
+  container.querySelectorAll("[data-areq]").forEach(b=>b.onclick = ()=>adminResetByRequest(b.dataset.areq, container));
+  container.querySelectorAll("[data-astaff]").forEach(b=>b.onclick = ()=>adminResetStaff(b.dataset.astaff, container));
+  container.querySelectorAll("[data-adismiss]").forEach(b=>b.onclick = ()=>{
+    db.resetRequests = (db.resetRequests||[]).filter(r=>r.id!==b.dataset.adismiss);
+    persist(); renderAdmin(container);
+  });
+  const ch = container.querySelector("#admChange");
+  if(ch) ch.onclick = async ()=>{
+    const a = container.querySelector("#admNew").value, b2 = container.querySelector("#admNew2").value;
+    if(a.length < 4){ toast("Admin password must be at least 4 characters", true); return; }
+    if(a !== b2){ toast("Passwords don't match", true); return; }
+    await setAdminPassword(a); toast("Admin password changed"); renderAdmin(container);
+  };
+}
+async function adminResetStaff(empId, container){
+  const e = emp(empId); if(!e) return;
+  const pw = genPassword();
+  await setEmpPassword(e, pw, true);                       // temp password, must change on next sign-in
+  db.resetRequests = (db.resetRequests||[]).filter(r=>r.empId!==empId);  // clear any pending request
+  persist(); renderStaff(); renderAdmin(container);
+  showTempPassword(e, pw);
+}
+function adminResetByRequest(reqId, container){
+  const r = (db.resetRequests||[]).find(x=>x.id===reqId); if(!r) return;
+  adminResetStaff(r.empId, container);
+}
+$("#adminLock").addEventListener("click", ()=>{
+  cashierId = null; refreshCashierChip(); renderCart();
+  activateView("register"); requireSignIn();    // sign out & return to the locked sign-in screen
+});
+
 /* ---------------- payment flow ---------------- */
 $("#chargeBtn").addEventListener("click", ()=>{
   if(!cart.length) return;
-  if(!cashierId || !emp(cashierId) || !emp(cashierId).active){ pickCashier(true); toast("Sign a cashier in first", true); return; }
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   payState = { method:"cash", tender:0, busy:false };
   renderPayModal();
 });
@@ -1757,7 +1930,7 @@ function showSetupModal(){
   };
 }
 function afterSetup(){
-  if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
+  requireSignIn();   // on launch, lock the register until a cashier signs in (if any staff exist)
 }
 
 /* ---------------- first-run guided tour ---------------- */
@@ -1827,6 +2000,7 @@ function renderAll(){
   renderInventory(); renderSales(); renderReports(); renderStaff(); renderSettings();
 }
 loadDB().then(async ()=>{
+  await ensureAdminPassword();
   await loadDirHandle();
   renderAll(); refreshCashierChip(); updateSaveStatus(); updatePrinterStatus();
   btTryReconnect();
