@@ -417,7 +417,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
     <!-- STAFF -->
     <section class="view" id="view-staff">
       <div class="vhead">
-        <div><h2>Staff</h2><p>Every sale is logged against the cashier signed in on the register.</p></div>
+        <div><h2>Staff</h2><p>Each staff member signs in with their own password. New members get a temporary password and set their own on first sign-in. Every sale is logged against the cashier signed in.</p></div>
         <button class="btn grn" id="addStaffBtn">+ Add staff member</button>
       </div>
       <div class="card tbl-wrap"><table>
@@ -436,8 +436,22 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
           <div class="field"><label>Tax rate (%)</label><input id="setTax" type="number" min="0" max="60" step="0.5"></div>
         </div>
         <div class="field"><label>Receipt footer message</label><input id="setFoot"></div>
-        <div class="field"><label>Receipt paper width</label>
-          <select id="setPaper"><option value="32">58 mm (32 characters)</option><option value="48">80 mm (48 characters)</option></select></div>
+        <div class="frow">
+          <div class="field"><label>Receipt paper width</label>
+            <select id="setPaper"><option value="32">58 mm (32 characters)</option><option value="48">80 mm (48 characters)</option></select></div>
+          <div class="field"><label>Paper cutter</label>
+            <select id="setCut">
+              <option value="auto">Auto (cut if supported)</option>
+              <option value="none">No cutter — feed only</option>
+              <option value="partial">Partial cut</option>
+              <option value="full">Full cut</option>
+            </select></div>
+        </div>
+        <div class="field"><label>Printer character set</label>
+          <select id="setCharset">
+            <option value="ascii">Standard (works on any printer)</option>
+            <option value="cp1252">Western / CP1252 (£, €, accents)</option>
+          </select></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
           <button class="btn red sm" id="resetData">Reset all data</button>
           <button class="btn grn" id="saveSettings">Save settings</button>
@@ -500,7 +514,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32 },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, cut:"auto", charset:"ascii", printerId:"" },
   seq:1001,
   employees:[],
   products:[],
@@ -877,6 +891,103 @@ $("#discBtn").addEventListener("click", ()=>{
   $("#dClear").onclick = ()=>{ discount={type:null,value:0}; closeModal(); renderCart(); };
 });
 
+/* ---------------- staff passwords & sign-in ----------------
+   Each staff member signs in to the register with a password. New staff get a
+   generated temporary password; first sign-in with it forces a change. Passwords
+   are stored hashed (SHA-256 + per-user salt) via Web Crypto — never in plain text. */
+function randBytes(n){
+  const a = new Uint8Array(n);
+  if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+  else for(let i=0;i<n;i++) a[i] = Math.floor(Math.random()*256);
+  return a;
+}
+function genPassword(){
+  const cs = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no easily-confused characters
+  const p = [...randBytes(8)].map(x=>cs[x%cs.length]).join("");
+  return p.slice(0,4) + "-" + p.slice(4);
+}
+function genSalt(){ return [...randBytes(8)].map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function hashPass(pw, salt){
+  const data = salt + "::" + pw;
+  if(window.crypto && crypto.subtle && crypto.subtle.digest){
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+    return "s1:" + [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+  let h = 5381>>>0; for(let i=0;i<data.length;i++){ h = (((h<<5)+h) + data.charCodeAt(i))>>>0; }
+  return "f1:" + h.toString(16); // fallback for insecure contexts without SubtleCrypto
+}
+async function setEmpPassword(e, pw, mustChange){
+  e.salt = genSalt(); e.pass = await hashPass(pw, e.salt); e.mustChange = !!mustChange;
+}
+async function verifyPassword(e, pw){
+  if(!e || !e.pass || !e.salt) return false;
+  return (await hashPass(pw, e.salt)) === e.pass;
+}
+function finalizeSignIn(e){
+  cashierId = e.id; refreshCashierChip(); renderCart(); renderStaff(); closeModal();
+  toast(e.name + " signed in");
+}
+function promptLogin(id){
+  const e = emp(id); if(!e) return;
+  if(!e.pass) return promptChangePassword(e, true); // no password yet (e.g. legacy data) → set one now
+  openModal(`
+    <div class="mhead"><h3>Sign in — ${esc(e.name)}</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <div class="field"><label>Password</label><input id="logPass" type="password" autocomplete="off"></div>
+      <p style="color:var(--mut);font-size:12.5px">Enter your password to sign in to the register.</p>
+    </div>
+    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="logGo">Sign in</button></div>`);
+  const inp = $("#logPass"); inp.focus();
+  const go = async ()=>{
+    const pw = inp.value;
+    if(!pw){ toast("Enter your password", true); return; }
+    if(await verifyPassword(e, pw)){
+      if(e.mustChange) promptChangePassword(e, true);
+      else finalizeSignIn(e);
+    }else{ toast("Incorrect password", true); inp.value = ""; inp.focus(); }
+  };
+  $("#logGo").onclick = go;
+  inp.addEventListener("keydown", ev=>{ if(ev.key==="Enter") go(); });
+}
+function promptChangePassword(e, firstTime){
+  openModal(`
+    <div class="mhead"><h3>${firstTime?"Set your password":"Change password"}</h3>${firstTime?"":'<button class="mclose">×</button>'}</div>
+    <div class="mbody">
+      ${firstTime?`<p style="color:var(--mut);font-size:13px;line-height:1.55;margin-bottom:12px">Welcome, ${esc(e.name)}. Choose a password you'll use to sign in from now on.</p>`:""}
+      <div class="field"><label>New password</label><input id="np1" type="password" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm password</label><input id="np2" type="password" autocomplete="new-password"></div>
+      <p style="color:var(--mut);font-size:12px">At least 4 characters.</p>
+    </div>
+    <div class="mfoot">${firstTime?"":'<button class="btn mclose">Cancel</button>'}<button class="btn grn" id="npGo">Save password</button></div>`);
+  $("#np1").focus();
+  $("#npGo").onclick = async ()=>{
+    const a = $("#np1").value, b = $("#np2").value;
+    if(a.length < 4){ toast("Password must be at least 4 characters", true); return; }
+    if(a !== b){ toast("Passwords don't match", true); return; }
+    await setEmpPassword(e, a, false);
+    persist();
+    if(firstTime){ finalizeSignIn(e); toast("Password set — you're signed in"); }
+    else{ closeModal(); renderStaff(); toast("Password changed"); }
+  };
+}
+function showTempPassword(e, pw){
+  openModal(`
+    <div class="mhead"><h3>Temporary password</h3><button class="mclose">×</button></div>
+    <div class="mbody">
+      <p style="color:var(--mut);font-size:13.5px;line-height:1.6;margin-bottom:14px">Give this password to <b style="color:var(--text)">${esc(e.name)}</b>. They'll be asked to set their own password the first time they sign in.</p>
+      <div style="display:flex;gap:10px;align-items:center">
+        <code id="tmpPw" style="flex:1;font-family:var(--mono);font-size:20px;font-weight:700;letter-spacing:1px;background:var(--ink3);border:1px solid var(--line);border-radius:9px;padding:12px 14px;text-align:center">${esc(pw)}</code>
+        <button class="btn" id="copyPw">Copy</button>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn grn mclose">Done</button></div>`);
+  $("#copyPw").onclick = ()=>{
+    const done = ()=>toast("Password copied");
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(pw).then(done, done);
+    else{ try{ const r=document.createRange(); r.selectNode($("#tmpPw")); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand("copy"); getSelection().removeAllRanges(); }catch(err){} done(); }
+  };
+}
+
 /* ---------------- cashier picker ---------------- */
 function pickCashier(force){
   const active = db.employees.filter(e=>e.active);
@@ -888,10 +999,7 @@ function pickCashier(force){
         <span>${esc(e.name)}<br><small style="color:var(--mut);font-weight:400">${esc(e.role||"Cashier")}</small></span></button>`).join("")}</div>`
       : `<div class="empty"><b>No active staff</b>Add a staff member first.</div>`}
     </div>`);
-  $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>{
-    cashierId = b.dataset.emp; refreshCashierChip(); renderCart(); closeModal();
-    toast(emp(cashierId).name + " signed in");
-  });
+  $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>promptLogin(b.dataset.emp));
 }
 $("#cashierChip").addEventListener("click", ()=>pickCashier(false));
 function refreshCashierChip(){
@@ -1071,6 +1179,12 @@ const PRINTER_SERVICES = [
 let btDevice = null, btChar = null;
 function btConnected(){ return !!(btChar && btDevice && btDevice.gatt && btDevice.gatt.connected); }
 function paperCols(){ return db.settings.paper===48 ? 48 : 32; }
+function btOnDisconnect(){ btChar = null; updatePrinterStatus(); }
+function useDevice(d){
+  btDevice = d;
+  btDevice.removeEventListener("gattserverdisconnected", btOnDisconnect);
+  btDevice.addEventListener("gattserverdisconnected", btOnDisconnect);
+}
 
 /* pick the first writable characteristic across the printer's services */
 async function btFindWritable(server){
@@ -1087,12 +1201,12 @@ async function btConnect(){
   if(!BT_SUPPORTED){ toast("This browser can't use Bluetooth — use “Print receipt” instead", true); return false; }
   try{
     if(!btDevice){
-      btDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:PRINTER_SERVICES });
-      btDevice.addEventListener("gattserverdisconnected", ()=>{ btChar=null; updatePrinterStatus(); });
+      useDevice(await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:PRINTER_SERVICES }));
     }
     const server = await btDevice.gatt.connect();
     btChar = await btFindWritable(server);
     if(!btChar){ toast("Connected, but no printable channel was found on that device", true); updatePrinterStatus(); return false; }
+    if(btDevice.id && db.settings.printerId !== btDevice.id){ db.settings.printerId = btDevice.id; persist(); }  // remember for next launch
     toast("Printer connected: " + (btDevice.name||"Bluetooth printer"));
     updatePrinterStatus();
     return true;
@@ -1104,34 +1218,70 @@ async function btConnect(){
 }
 function btDisconnect(){
   try{ if(btDevice && btDevice.gatt && btDevice.gatt.connected) btDevice.gatt.disconnect(); }catch(e){}
-  btChar = null; btDevice = null; updatePrinterStatus();
+  btChar = null; btDevice = null;
+  if(db.settings.printerId){ db.settings.printerId = ""; persist(); }  // forget it — no auto-reconnect next time
+  updatePrinterStatus();
+}
+/* Silently re-attach to a previously-connected printer on launch (Chrome/Edge
+   on Android, Windows, Linux). Best-effort: if the printer is off or out of
+   range it just stays disconnected until reconnected from Settings. */
+async function btTryReconnect(){
+  if(!BT_SUPPORTED || !navigator.bluetooth.getDevices || !db.settings.printerId) return;
+  try{
+    const devs = await navigator.bluetooth.getDevices();
+    const d = devs.find(x=>x.id===db.settings.printerId);
+    if(!d) return;
+    useDevice(d);
+    const server = await btDevice.gatt.connect();
+    btChar = await btFindWritable(server);
+    updatePrinterStatus();
+  }catch(e){ /* printer unavailable right now — reconnect from Settings when needed */ }
 }
 /* write in small chunks so we don't overrun the printer's BLE buffer */
+const btSleep = ms=>new Promise(r=>setTimeout(r,ms));
 async function btWrite(bytes){
-  const chunk = 128, sleep = ms=>new Promise(r=>setTimeout(r,ms));
+  const chunk = 100;
   const write = btChar.properties.writeWithoutResponse && btChar.writeValueWithoutResponse
     ? b=>btChar.writeValueWithoutResponse(b) : b=>btChar.writeValue(b);
   for(let i=0;i<bytes.length;i+=chunk){
     await write(bytes.slice(i, i+chunk));
-    await sleep(18);
+    await btSleep(20);
   }
 }
 
-/* ---- ESC/POS receipt builder ---- */
+/* ---- ESC/POS receipt builder (compatibility-focused) ----
+   Uses only the standard ESC/POS commands every printer implements, keeps text
+   as printable ASCII by default (so it renders identically no matter the
+   printer's code page), and picks the cut/feed behaviour from a setting so the
+   common printer variants all work out of the box. */
 const ESC = {
-  init:[0x1B,0x40], left:[0x1B,0x61,0], center:[0x1B,0x61,1],
+  left:[0x1B,0x61,0], center:[0x1B,0x61,1],
   boldOn:[0x1B,0x45,1], boldOff:[0x1B,0x45,0],
-  big:[0x1D,0x21,0x11], normal:[0x1D,0x21,0x00],
-  cut:[0x1D,0x56,0x42,0x00]
+  big:[0x1D,0x21,0x11], normal:[0x1D,0x21,0x00]
 };
-function encLine(str){
-  // normalise a few common non-ASCII glyphs, then map to single-byte codes
-  str = String(str).replace(/[—–]/g,"-").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[×]/g,"x").replace(/[·]/g,"-");
+function encStr(str){
+  const ascii = db.settings.charset !== "cp1252";
+  str = String(str)   // typography not present in any single-byte page anyway
+    .replace(/[—–]/g,"-").replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/[×]/g,"x").replace(/[·•]/g,"-").replace(/…/g,"...");
+  if(ascii){
+    // ASCII-safe: spell out currency symbols, fold accents to base letters
+    str = str
+      .replace(/£/g,"GBP").replace(/€/g,"EUR").replace(/¥/g,"JPY")
+      .replace(/₹/g,"INR").replace(/¢/g,"c").replace(/₦/g,"NGN").replace(/₵/g,"GHS")
+      .normalize("NFKD").replace(/[̀-ͯ]/g,"");
+  }
   const out = [];
-  for(const ch of str){ const c = ch.codePointAt(0); out.push(c<256?c:0x3F); }
-  out.push(0x0A);
+  for(const ch of str){
+    let c = ch.codePointAt(0);
+    if(!ascii && c === 0x20AC) c = 0x80;      // euro sign -> CP1252 position
+    if(c < 128) out.push(c);
+    else if(!ascii && c < 256) out.push(c);   // pass Latin-1 bytes through in CP1252 mode
+    else out.push(0x3F);
+  }
   return out;
 }
+function encLine(str){ const a = encStr(str); a.push(0x0A); return a; }
 function lineLR(l, r, cols){
   l = String(l); r = String(r);
   const room = cols - r.length - 1;
@@ -1139,12 +1289,25 @@ function lineLR(l, r, cols){
   const gap = Math.max(1, cols - l.length - r.length);
   return l + " ".repeat(gap) + r;
 }
+function initSequence(){
+  const b = [0x1B,0x40, 0x1B,0x52,0x00];               // reset printer + intl char set = USA
+  if(db.settings.charset === "cp1252") b.push(0x1B,0x74,0x10); // select code page WPC1252
+  return b;
+}
+function cutSequence(){
+  switch(db.settings.cut){
+    case "none":    return [0x1B,0x64,0x05];                       // feed only (tear-off printers)
+    case "full":    return [0x1B,0x64,0x04, 0x1D,0x56,0x00];       // feed + full cut
+    case "partial": return [0x1B,0x64,0x04, 0x1D,0x56,0x01];       // feed + partial cut
+    default:        return [0x1B,0x64,0x04, 0x1D,0x56,0x42,0x00];  // auto: feed + partial cut (no-op without a cutter)
+  }
+}
 function buildReceiptBytes(s){
   const st = db.settings, cols = paperCols(), rule = "-".repeat(cols);
   const methodName = {cash:"CASH", card:"CARD", wallet:"MOBILE WALLET"}[s.method]||s.method;
   let b = [];
   const push = (...a)=>a.forEach(x=>Array.isArray(x)?b.push(...x):b.push(x));
-  push(ESC.init, ESC.center);
+  push(initSequence(), ESC.center);
   if((st.store||"").trim()){ push(ESC.big, ESC.boldOn, encLine(st.store), ESC.normal, ESC.boldOff); }
   push(encLine(new Date(s.ts).toLocaleString()));
   push(encLine("Receipt " + s.id), encLine("Cashier: " + s.empName));
@@ -1163,14 +1326,16 @@ function buildReceiptBytes(s){
   if(s.method==="cash") push(encLine(lineLR("Change", fmt(s.change), cols)));
   if(s.auth) push(encLine(lineLR("Approval", s.auth, cols)));
   if((st.footer||"").trim()){ push(encLine(rule), ESC.center, encLine(st.footer), ESC.left); }
-  push([0x1B,0x64,0x03], ESC.cut);   // feed 3 lines, then cut (ignored by printers without a cutter)
+  push(cutSequence());
   return new Uint8Array(b);
 }
 async function printViaBluetooth(s){
   if(!BT_SUPPORTED){ toast("Bluetooth printing isn't available in this browser", true); return; }
-  if(!btConnected() && !(await btConnect())) return;
+  const wasConnected = btConnected();
+  if(!wasConnected && !(await btConnect())) return;
   try{
     toast("Printing…");
+    if(!wasConnected) await btSleep(150); // let a just-connected printer settle before the first bytes
     await btWrite(buildReceiptBytes(s));
     toast("Sent to printer");
   }catch(e){
@@ -1408,6 +1573,7 @@ function renderStaff(){
       <td><span class="badge ${e.active?"ok":"gray"}">${e.active?"Active":"Inactive"}</span></td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn sm" data-tgl="${e.id}">${e.active?"Deactivate":"Activate"}</button>
+        <button class="btn sm" data-pass="${e.id}">Reset password</button>
         <button class="btn sm" data-eedit="${e.id}">Edit</button>
         <button class="btn sm red" data-edel="${e.id}">Delete</button>
       </td></tr>`;
@@ -1419,6 +1585,17 @@ $("#staffBody").addEventListener("click", e=>{
   if(t){ const s = db.employees.find(x=>x.id===t.dataset.tgl); s.active=!s.active;
     if(!s.active && cashierId===s.id){ cashierId=null; refreshCashierChip(); }
     persist(); renderStaff(); return; }
+  const rp = e.target.closest("[data-pass]");
+  if(rp){
+    const s = db.employees.find(x=>x.id===rp.dataset.pass);
+    confirmModal(`Reset password for ${esc(s.name)}?`, "A new temporary password will be generated. They'll be asked to set their own password the next time they sign in.", async ()=>{
+      const pw = genPassword();
+      await setEmpPassword(s, pw, true);
+      persist(); renderStaff();
+      showTempPassword(s, pw);
+    });
+    return;
+  }
   const ed = e.target.closest("[data-eedit]"); if(ed) return staffModal(ed.dataset.eedit);
   const dl = e.target.closest("[data-edel]");
   if(dl){
@@ -1440,13 +1617,20 @@ function staffModal(id){
     </div>
     <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="sSave">${s?"Save":"Add"}</button></div>`);
   $("#sName").focus();
-  $("#sSave").onclick = ()=>{
+  $("#sSave").onclick = async ()=>{
     const name = $("#sName").value.trim();
     if(!name){ toast("Name is required", true); return; }
-    if(s){ s.name=name; s.role=$("#sRole").value.trim(); }
-    else db.employees.push({id:uid("e"), name, role:$("#sRole").value.trim()||"Cashier", active:true});
-    persist(); closeModal(); renderStaff(); refreshCashierChip();
-    toast(s?"Staff updated":"Staff member added");
+    if(s){
+      s.name = name; s.role = $("#sRole").value.trim();
+      persist(); closeModal(); renderStaff(); refreshCashierChip();
+      toast("Staff updated"); return;
+    }
+    const e = {id:uid("e"), name, role:$("#sRole").value.trim()||"Cashier", active:true};
+    const pw = genPassword();
+    await setEmpPassword(e, pw, true);           // temporary password, must change on first sign-in
+    db.employees.push(e);
+    persist(); renderStaff(); refreshCashierChip();
+    showTempPassword(e, pw);
   };
 }
 
@@ -1457,6 +1641,8 @@ function renderSettings(){
   $("#setTax").value = db.settings.taxRate;
   $("#setFoot").value = db.settings.footer;
   $("#setPaper").value = String(db.settings.paper===48 ? 48 : 32);
+  $("#setCut").value = ["auto","none","partial","full"].includes(db.settings.cut) ? db.settings.cut : "auto";
+  $("#setCharset").value = db.settings.charset==="cp1252" ? "cp1252" : "ascii";
 }
 $("#saveSettings").addEventListener("click", ()=>{
   db.settings.store = $("#setStore").value.trim() || "My Store";
@@ -1464,6 +1650,8 @@ $("#saveSettings").addEventListener("click", ()=>{
   db.settings.taxRate = Math.max(0, parseFloat($("#setTax").value)||0);
   db.settings.footer = $("#setFoot").value.trim();
   db.settings.paper = parseInt($("#setPaper").value)===48 ? 48 : 32;
+  db.settings.cut = ["auto","none","partial","full"].includes($("#setCut").value) ? $("#setCut").value : "auto";
+  db.settings.charset = $("#setCharset").value==="cp1252" ? "cp1252" : "ascii";
   persist(); renderAll(); toast("Settings saved");
 });
 $("#btConnectBtn").addEventListener("click", ()=>{ btConnected() ? btDisconnect() : btConnect(); });
@@ -1556,7 +1744,7 @@ const TOUR_STEPS = [
   { nav:"inventory", title:"2 · Inventory", body:"Your product library lives here. Add items with a price, cost, barcode and stock level. Stock counts down automatically with every sale, and you'll see low-stock alerts." },
   { nav:"sales", title:"3 · Sales log", body:"Every completed transaction is recorded here — who rang it up and how it was paid. You can reprint any receipt or export everything to CSV." },
   { nav:"reports", title:"4 · Reports", body:"See how the business is doing: revenue, top sellers, sales by staff, payment mix and category breakdowns across any date range." },
-  { nav:"staff", title:"5 · Staff", body:"Add the people who work the register. Each sale is logged against the cashier signed in, so you can track sales per person." },
+  { nav:"staff", title:"5 · Staff", body:"Add the people who work the register. Each new person gets a temporary password to sign in — they set their own on first use. Every sale is logged against the cashier signed in, so you can track sales per person." },
   { nav:"settings", title:"6 · Settings", body:"Set your store name, currency, tax rate and receipt message, connect a Bluetooth receipt printer, and back up or restore your data. A good place to start is adding your store details." },
   { nav:"register", title:"You're all set", body:"That's the whole system. Add your staff and products from the menu whenever you're ready — your first sale is just a tap away." }
 ];
@@ -1606,6 +1794,7 @@ function renderAll(){
 loadDB().then(async ()=>{
   await loadDirHandle();
   renderAll(); refreshCashierChip(); updateSaveStatus(); updatePrinterStatus();
+  btTryReconnect();
   focusScan();
   let setupDone = null, tourDone = null;
   try{ setupDone = await idbGet("setup-done"); }catch(e){ setupDone = 1; } // no IndexedDB → folder prompt can't persist either
