@@ -436,8 +436,22 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
           <div class="field"><label>Tax rate (%)</label><input id="setTax" type="number" min="0" max="60" step="0.5"></div>
         </div>
         <div class="field"><label>Receipt footer message</label><input id="setFoot"></div>
-        <div class="field"><label>Receipt paper width</label>
-          <select id="setPaper"><option value="32">58 mm (32 characters)</option><option value="48">80 mm (48 characters)</option></select></div>
+        <div class="frow">
+          <div class="field"><label>Receipt paper width</label>
+            <select id="setPaper"><option value="32">58 mm (32 characters)</option><option value="48">80 mm (48 characters)</option></select></div>
+          <div class="field"><label>Paper cutter</label>
+            <select id="setCut">
+              <option value="auto">Auto (cut if supported)</option>
+              <option value="none">No cutter — feed only</option>
+              <option value="partial">Partial cut</option>
+              <option value="full">Full cut</option>
+            </select></div>
+        </div>
+        <div class="field"><label>Printer character set</label>
+          <select id="setCharset">
+            <option value="ascii">Standard (works on any printer)</option>
+            <option value="cp1252">Western / CP1252 (£, €, accents)</option>
+          </select></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
           <button class="btn red sm" id="resetData">Reset all data</button>
           <button class="btn grn" id="saveSettings">Save settings</button>
@@ -500,7 +514,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, printerId:"" },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, cut:"auto", charset:"ascii", printerId:"" },
   seq:1001,
   employees:[],
   products:[],
@@ -1224,31 +1238,50 @@ async function btTryReconnect(){
   }catch(e){ /* printer unavailable right now — reconnect from Settings when needed */ }
 }
 /* write in small chunks so we don't overrun the printer's BLE buffer */
+const btSleep = ms=>new Promise(r=>setTimeout(r,ms));
 async function btWrite(bytes){
-  const chunk = 128, sleep = ms=>new Promise(r=>setTimeout(r,ms));
+  const chunk = 100;
   const write = btChar.properties.writeWithoutResponse && btChar.writeValueWithoutResponse
     ? b=>btChar.writeValueWithoutResponse(b) : b=>btChar.writeValue(b);
   for(let i=0;i<bytes.length;i+=chunk){
     await write(bytes.slice(i, i+chunk));
-    await sleep(18);
+    await btSleep(20);
   }
 }
 
-/* ---- ESC/POS receipt builder ---- */
+/* ---- ESC/POS receipt builder (compatibility-focused) ----
+   Uses only the standard ESC/POS commands every printer implements, keeps text
+   as printable ASCII by default (so it renders identically no matter the
+   printer's code page), and picks the cut/feed behaviour from a setting so the
+   common printer variants all work out of the box. */
 const ESC = {
-  init:[0x1B,0x40], left:[0x1B,0x61,0], center:[0x1B,0x61,1],
+  left:[0x1B,0x61,0], center:[0x1B,0x61,1],
   boldOn:[0x1B,0x45,1], boldOff:[0x1B,0x45,0],
-  big:[0x1D,0x21,0x11], normal:[0x1D,0x21,0x00],
-  cut:[0x1D,0x56,0x42,0x00]
+  big:[0x1D,0x21,0x11], normal:[0x1D,0x21,0x00]
 };
-function encLine(str){
-  // normalise a few common non-ASCII glyphs, then map to single-byte codes
-  str = String(str).replace(/[—–]/g,"-").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[×]/g,"x").replace(/[·]/g,"-");
+function encStr(str){
+  const ascii = db.settings.charset !== "cp1252";
+  str = String(str)   // typography not present in any single-byte page anyway
+    .replace(/[—–]/g,"-").replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/[×]/g,"x").replace(/[·•]/g,"-").replace(/…/g,"...");
+  if(ascii){
+    // ASCII-safe: spell out currency symbols, fold accents to base letters
+    str = str
+      .replace(/£/g,"GBP").replace(/€/g,"EUR").replace(/¥/g,"JPY")
+      .replace(/₹/g,"INR").replace(/¢/g,"c").replace(/₦/g,"NGN").replace(/₵/g,"GHS")
+      .normalize("NFKD").replace(/[̀-ͯ]/g,"");
+  }
   const out = [];
-  for(const ch of str){ const c = ch.codePointAt(0); out.push(c<256?c:0x3F); }
-  out.push(0x0A);
+  for(const ch of str){
+    let c = ch.codePointAt(0);
+    if(!ascii && c === 0x20AC) c = 0x80;      // euro sign -> CP1252 position
+    if(c < 128) out.push(c);
+    else if(!ascii && c < 256) out.push(c);   // pass Latin-1 bytes through in CP1252 mode
+    else out.push(0x3F);
+  }
   return out;
 }
+function encLine(str){ const a = encStr(str); a.push(0x0A); return a; }
 function lineLR(l, r, cols){
   l = String(l); r = String(r);
   const room = cols - r.length - 1;
@@ -1256,12 +1289,25 @@ function lineLR(l, r, cols){
   const gap = Math.max(1, cols - l.length - r.length);
   return l + " ".repeat(gap) + r;
 }
+function initSequence(){
+  const b = [0x1B,0x40, 0x1B,0x52,0x00];               // reset printer + intl char set = USA
+  if(db.settings.charset === "cp1252") b.push(0x1B,0x74,0x10); // select code page WPC1252
+  return b;
+}
+function cutSequence(){
+  switch(db.settings.cut){
+    case "none":    return [0x1B,0x64,0x05];                       // feed only (tear-off printers)
+    case "full":    return [0x1B,0x64,0x04, 0x1D,0x56,0x00];       // feed + full cut
+    case "partial": return [0x1B,0x64,0x04, 0x1D,0x56,0x01];       // feed + partial cut
+    default:        return [0x1B,0x64,0x04, 0x1D,0x56,0x42,0x00];  // auto: feed + partial cut (no-op without a cutter)
+  }
+}
 function buildReceiptBytes(s){
   const st = db.settings, cols = paperCols(), rule = "-".repeat(cols);
   const methodName = {cash:"CASH", card:"CARD", wallet:"MOBILE WALLET"}[s.method]||s.method;
   let b = [];
   const push = (...a)=>a.forEach(x=>Array.isArray(x)?b.push(...x):b.push(x));
-  push(ESC.init, ESC.center);
+  push(initSequence(), ESC.center);
   if((st.store||"").trim()){ push(ESC.big, ESC.boldOn, encLine(st.store), ESC.normal, ESC.boldOff); }
   push(encLine(new Date(s.ts).toLocaleString()));
   push(encLine("Receipt " + s.id), encLine("Cashier: " + s.empName));
@@ -1280,14 +1326,16 @@ function buildReceiptBytes(s){
   if(s.method==="cash") push(encLine(lineLR("Change", fmt(s.change), cols)));
   if(s.auth) push(encLine(lineLR("Approval", s.auth, cols)));
   if((st.footer||"").trim()){ push(encLine(rule), ESC.center, encLine(st.footer), ESC.left); }
-  push([0x1B,0x64,0x03], ESC.cut);   // feed 3 lines, then cut (ignored by printers without a cutter)
+  push(cutSequence());
   return new Uint8Array(b);
 }
 async function printViaBluetooth(s){
   if(!BT_SUPPORTED){ toast("Bluetooth printing isn't available in this browser", true); return; }
-  if(!btConnected() && !(await btConnect())) return;
+  const wasConnected = btConnected();
+  if(!wasConnected && !(await btConnect())) return;
   try{
     toast("Printing…");
+    if(!wasConnected) await btSleep(150); // let a just-connected printer settle before the first bytes
     await btWrite(buildReceiptBytes(s));
     toast("Sent to printer");
   }catch(e){
@@ -1593,6 +1641,8 @@ function renderSettings(){
   $("#setTax").value = db.settings.taxRate;
   $("#setFoot").value = db.settings.footer;
   $("#setPaper").value = String(db.settings.paper===48 ? 48 : 32);
+  $("#setCut").value = ["auto","none","partial","full"].includes(db.settings.cut) ? db.settings.cut : "auto";
+  $("#setCharset").value = db.settings.charset==="cp1252" ? "cp1252" : "ascii";
 }
 $("#saveSettings").addEventListener("click", ()=>{
   db.settings.store = $("#setStore").value.trim() || "My Store";
@@ -1600,6 +1650,8 @@ $("#saveSettings").addEventListener("click", ()=>{
   db.settings.taxRate = Math.max(0, parseFloat($("#setTax").value)||0);
   db.settings.footer = $("#setFoot").value.trim();
   db.settings.paper = parseInt($("#setPaper").value)===48 ? 48 : 32;
+  db.settings.cut = ["auto","none","partial","full"].includes($("#setCut").value) ? $("#setCut").value : "auto";
+  db.settings.charset = $("#setCharset").value==="cp1252" ? "cp1252" : "ascii";
   persist(); renderAll(); toast("Settings saved");
 });
 $("#btConnectBtn").addEventListener("click", ()=>{ btConnected() ? btDisconnect() : btConnect(); });
