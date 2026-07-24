@@ -500,7 +500,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
-  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32 },
+  settings:{ store:"", currency:"J$", taxRate:15, footer:"Thank you for your business!", paper:32, printerId:"" },
   seq:1001,
   employees:[],
   products:[],
@@ -1071,6 +1071,12 @@ const PRINTER_SERVICES = [
 let btDevice = null, btChar = null;
 function btConnected(){ return !!(btChar && btDevice && btDevice.gatt && btDevice.gatt.connected); }
 function paperCols(){ return db.settings.paper===48 ? 48 : 32; }
+function btOnDisconnect(){ btChar = null; updatePrinterStatus(); }
+function useDevice(d){
+  btDevice = d;
+  btDevice.removeEventListener("gattserverdisconnected", btOnDisconnect);
+  btDevice.addEventListener("gattserverdisconnected", btOnDisconnect);
+}
 
 /* pick the first writable characteristic across the printer's services */
 async function btFindWritable(server){
@@ -1087,12 +1093,12 @@ async function btConnect(){
   if(!BT_SUPPORTED){ toast("This browser can't use Bluetooth — use “Print receipt” instead", true); return false; }
   try{
     if(!btDevice){
-      btDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:PRINTER_SERVICES });
-      btDevice.addEventListener("gattserverdisconnected", ()=>{ btChar=null; updatePrinterStatus(); });
+      useDevice(await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:PRINTER_SERVICES }));
     }
     const server = await btDevice.gatt.connect();
     btChar = await btFindWritable(server);
     if(!btChar){ toast("Connected, but no printable channel was found on that device", true); updatePrinterStatus(); return false; }
+    if(btDevice.id && db.settings.printerId !== btDevice.id){ db.settings.printerId = btDevice.id; persist(); }  // remember for next launch
     toast("Printer connected: " + (btDevice.name||"Bluetooth printer"));
     updatePrinterStatus();
     return true;
@@ -1104,7 +1110,24 @@ async function btConnect(){
 }
 function btDisconnect(){
   try{ if(btDevice && btDevice.gatt && btDevice.gatt.connected) btDevice.gatt.disconnect(); }catch(e){}
-  btChar = null; btDevice = null; updatePrinterStatus();
+  btChar = null; btDevice = null;
+  if(db.settings.printerId){ db.settings.printerId = ""; persist(); }  // forget it — no auto-reconnect next time
+  updatePrinterStatus();
+}
+/* Silently re-attach to a previously-connected printer on launch (Chrome/Edge
+   on Android, Windows, Linux). Best-effort: if the printer is off or out of
+   range it just stays disconnected until reconnected from Settings. */
+async function btTryReconnect(){
+  if(!BT_SUPPORTED || !navigator.bluetooth.getDevices || !db.settings.printerId) return;
+  try{
+    const devs = await navigator.bluetooth.getDevices();
+    const d = devs.find(x=>x.id===db.settings.printerId);
+    if(!d) return;
+    useDevice(d);
+    const server = await btDevice.gatt.connect();
+    btChar = await btFindWritable(server);
+    updatePrinterStatus();
+  }catch(e){ /* printer unavailable right now — reconnect from Settings when needed */ }
 }
 /* write in small chunks so we don't overrun the printer's BLE buffer */
 async function btWrite(bytes){
@@ -1606,6 +1629,7 @@ function renderAll(){
 loadDB().then(async ()=>{
   await loadDirHandle();
   renderAll(); refreshCashierChip(); updateSaveStatus(); updatePrinterStatus();
+  btTryReconnect();
   focusScan();
   let setupDone = null, tourDone = null;
   try{ setupDone = await idbGet("setup-done"); }catch(e){ setupDone = 1; } // no IndexedDB → folder prompt can't persist either
