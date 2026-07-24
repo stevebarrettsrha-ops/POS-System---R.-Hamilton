@@ -541,6 +541,7 @@ let cashierId = null;
 let activeCat = "All";
 let repRange = "today";
 let payState = null;                 // transient payment modal state
+let signinLock = false;              // true while the register is locked awaiting sign-in
 let storageOK = false;
 
 /* ---------------- persistence: IndexedDB (primary store) ---------------- */
@@ -689,6 +690,7 @@ function restoreFromObject(obj){
     cart = []; discount = {type:null, value:0}; cashierId = null;
     persist(); refreshCashierChip(); renderAll();
     toast("Backup restored");
+    requireSignIn();
   });
 }
 async function updateSaveStatus(){
@@ -783,6 +785,7 @@ $("#prodGrid").addEventListener("click", e=>{
 });
 
 function addToCart(pid){
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   const p = db.products.find(x=>x.id===pid); if(!p) return;
   const line = cart.find(l=>l.pid===pid);
   const inCart = line ? line.qty : 0;
@@ -863,6 +866,7 @@ $("#clearCart").addEventListener("click", ()=>{
 /* barcode / SKU entry */
 $("#scanInput").addEventListener("keydown", e=>{
   if(e.key!=="Enter") return;
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   const code = e.target.value.trim(); if(!code) return;
   const p = db.products.find(x=>String(x.sku).toLowerCase()===code.toLowerCase());
   if(p){ addToCart(p.id); e.target.value=""; }
@@ -876,9 +880,10 @@ function openModal(html, wide){
   $("#ovl").classList.add("on");
 }
 function closeModal(){ $("#ovl").classList.remove("on"); payState=null; }
-$("#ovl").addEventListener("click", e=>{ if(e.target.id==="ovl" && !(payState&&payState.busy)) closeModal(); });
-document.addEventListener("click", e=>{ if(e.target.closest(".mclose")) closeModal(); });
-document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !(payState&&payState.busy)) closeModal(); });
+/* while the register is locked awaiting sign-in, the modal can't be dismissed */
+$("#ovl").addEventListener("click", e=>{ if(e.target.id==="ovl" && !signinLock && !(payState&&payState.busy)) closeModal(); });
+document.addEventListener("click", e=>{ if(e.target.closest(".mclose") && !signinLock) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !signinLock && !(payState&&payState.busy)) closeModal(); });
 
 /* ---------------- discount modal ---------------- */
 $("#discBtn").addEventListener("click", ()=>{
@@ -938,19 +943,21 @@ async function verifyPassword(e, pw){
   return (await hashPass(pw, e.salt)) === e.pass;
 }
 function finalizeSignIn(e){
+  signinLock = false;
   cashierId = e.id; refreshCashierChip(); renderCart(); renderStaff(); closeModal();
   toast(e.name + " signed in");
 }
 function promptLogin(id){
   const e = emp(id); if(!e) return;
   if(!e.pass) return promptChangePassword(e, true); // no password yet (e.g. legacy data) → set one now
+  const locked = signinLock;
   openModal(`
-    <div class="mhead"><h3>Sign in — ${esc(e.name)}</h3><button class="mclose">×</button></div>
+    <div class="mhead"><h3>Sign in — ${esc(e.name)}</h3>${locked?"":'<button class="mclose">×</button>'}</div>
     <div class="mbody">
       <div class="field"><label>Password</label><input id="logPass" type="password" autocomplete="off"></div>
       <p style="color:var(--mut);font-size:12.5px">Enter your password to sign in to the register.</p>
     </div>
-    <div class="mfoot"><button class="btn mclose">Cancel</button><button class="btn grn" id="logGo">Sign in</button></div>`);
+    <div class="mfoot"><button class="btn" id="logCancel">${locked?"Back":"Cancel"}</button><button class="btn grn" id="logGo">Sign in</button></div>`);
   const inp = $("#logPass"); inp.focus();
   const go = async ()=>{
     const pw = inp.value;
@@ -961,6 +968,7 @@ function promptLogin(id){
     }else{ toast("Incorrect password", true); inp.value = ""; inp.focus(); }
   };
   $("#logGo").onclick = go;
+  $("#logCancel").onclick = ()=>{ if(locked) pickCashier(true); else closeModal(); };
   inp.addEventListener("keydown", ev=>{ if(ev.key==="Enter") go(); });
 }
 function promptChangePassword(e, firstTime){
@@ -1015,13 +1023,24 @@ function pickCashier(force){
     </div>`);
   $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>promptLogin(b.dataset.emp));
 }
-$("#cashierChip").addEventListener("click", ()=>pickCashier(false));
+$("#cashierChip").addEventListener("click", ()=>{ if(!signinLock) pickCashier(false); });
+function cashierSignedIn(){ const c = emp(cashierId); return !!(c && c.active); }
+/* Lock the register behind the sign-in prompt whenever no cashier is signed in
+   and there is at least one active staff member who could sign in. (With no
+   active staff yet — e.g. a brand-new setup — it stays open so staff can be added.) */
+function requireSignIn(){
+  if(cashierSignedIn()){ signinLock = false; return; }
+  if(!db.employees.some(e=>e.active)){ signinLock = false; return; }
+  signinLock = true;
+  pickCashier(true);
+}
 function signOut(){
   if(!cashierId) return;
   const name = emp(cashierId) ? emp(cashierId).name : "Cashier";
   cashierId = null;
   refreshCashierChip(); renderCart(); renderStaff();
   toast(name + " signed out");
+  requireSignIn();   // re-lock: show "Who's on the register?" until someone signs in
 }
 $("#signOutBtn").addEventListener("click", signOut);
 function refreshCashierChip(){
@@ -1034,7 +1053,7 @@ function refreshCashierChip(){
 /* ---------------- payment flow ---------------- */
 $("#chargeBtn").addEventListener("click", ()=>{
   if(!cart.length) return;
-  if(!cashierId || !emp(cashierId) || !emp(cashierId).active){ pickCashier(true); toast("Sign a cashier in first", true); return; }
+  if(!cashierSignedIn()){ requireSignIn(); return; }
   payState = { method:"cash", tender:0, busy:false };
   renderPayModal();
 });
@@ -1757,7 +1776,7 @@ function showSetupModal(){
   };
 }
 function afterSetup(){
-  if(db.employees.filter(e=>e.active).length && !cashierId) pickCashier(false);
+  requireSignIn();   // on launch, lock the register until a cashier signs in (if any staff exist)
 }
 
 /* ---------------- first-run guided tour ---------------- */
