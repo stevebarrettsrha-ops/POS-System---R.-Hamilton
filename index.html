@@ -220,6 +220,16 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 .bar-fill{transition:width .5s cubic-bezier(.25,.9,.35,1)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
+/* ---------- guided tour ---------- */
+#tourDim{position:fixed;inset:0;background:rgba(6,9,13,.28);z-index:70;display:none}
+#tourDim.on{display:block}
+.tour-spot{position:relative;z-index:74;border-radius:10px;background:var(--ink2)!important;
+  box-shadow:0 0 0 2px var(--grn),0 0 0 7px rgba(47,165,123,.28)}
+#tourCard{position:fixed;z-index:75;left:50%;bottom:26px;transform:translateX(-50%);
+  width:min(440px,calc(100vw - 32px));background:var(--ink2);border:1px solid var(--line);
+  border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none}
+#tourCard.on{display:block;animation:popIn .24s cubic-bezier(.25,.9,.35,1.15)}
+
 /* ---------- category dropdown (mobile) ---------- */
 .catselect{display:none;margin-bottom:12px}
 
@@ -284,6 +294,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   .charge{margin-top:10px}
   #chargeBtn{padding:16px}
   #toast{bottom:calc(88px + env(safe-area-inset-bottom));z-index:90;max-width:calc(100vw - 28px)}
+  #tourCard{bottom:calc(82px + env(safe-area-inset-bottom));width:calc(100vw - 24px)}
   /* modals slide from bottom on phones */
   .overlay{align-items:flex-end;padding:0}
   .modal{max-width:none;border-radius:18px 18px 0 0;max-height:92dvh}
@@ -309,10 +320,11 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
       <button data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4.1 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4.1h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114.1 0v.2a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.2a2 2 0 110 4.1h-.2a1.7 1.7 0 00-1.5 1z"/></svg><span>Settings</span></button>
     </nav>
     <div class="side-foot">
-      <button class="cashier-chip" id="cashierChip" title="Switch cashier">
+      <button class="cashier-chip" id="cashierChip" title="Sign in / switch cashier">
         <span class="avatar" id="cashAvatar">?</span>
         <span class="txt"><span class="nm" id="cashName">No cashier</span><br><span class="rl">on register</span></span>
       </button>
+      <button class="btn sm" id="signOutBtn" style="display:none;width:100%;margin-top:8px;justify-content:center">Sign out</button>
     </div>
   </aside>
 
@@ -494,6 +506,8 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   <div class="modal" id="modalBox"></div>
 </div>
 <div id="toast"></div>
+<div id="tourDim"></div>
+<div id="tourCard"></div>
 <div id="printArea"></div>
 
 <script>
@@ -1002,10 +1016,19 @@ function pickCashier(force){
   $("#modalBox").querySelectorAll("[data-emp]").forEach(b=>b.onclick = ()=>promptLogin(b.dataset.emp));
 }
 $("#cashierChip").addEventListener("click", ()=>pickCashier(false));
+function signOut(){
+  if(!cashierId) return;
+  const name = emp(cashierId) ? emp(cashierId).name : "Cashier";
+  cashierId = null;
+  refreshCashierChip(); renderCart(); renderStaff();
+  toast(name + " signed out");
+}
+$("#signOutBtn").addEventListener("click", signOut);
 function refreshCashierChip(){
   const c = emp(cashierId);
   $("#cashAvatar").textContent = c ? (c.name[0]||"?") : "?";
   $("#cashName").textContent = c ? c.name : "No cashier";
+  const so = $("#signOutBtn"); if(so) so.style.display = c ? "inline-flex" : "none";
 }
 
 /* ---------------- payment flow ---------------- */
@@ -1752,32 +1775,44 @@ function goToView(name){
   const b = document.querySelector('.side [data-nav="'+name+'"]');
   if(b) b.click();
 }
+/* Spotlight-style tour: a card anchored at the bottom (so the section stays
+   visible) plus a highlight on the matching menu item, instead of a modal that
+   covers the very section it's describing. */
 function startTour(onDone){
   let i = 0, done = false;
+  const dim = $("#tourDim"), card = $("#tourCard");
+  const clearSpot = ()=>document.querySelectorAll(".tour-spot").forEach(el=>el.classList.remove("tour-spot"));
   const finish = ()=>{
     if(done) return; done = true;
     try{ idbSet("tour-done", 1); }catch(e){}
-    closeModal(); goToView("register");
+    clearSpot();
+    dim.classList.remove("on"); card.classList.remove("on"); card.innerHTML = "";
+    goToView("register");
     if(onDone) onDone();
   };
   function render(){
     const s = TOUR_STEPS[i], last = i === TOUR_STEPS.length - 1;
-    goToView(s.nav);
+    goToView(s.nav);                       // show the section this step describes
+    clearSpot();                            // highlight its menu item (sidebar + bottom nav)
+    document.querySelectorAll('[data-nav="'+s.nav+'"]').forEach(el=>el.classList.add("tour-spot"));
     const dots = TOUR_STEPS.map((_,k)=>`<span style="width:7px;height:7px;border-radius:50%;background:${k===i?'var(--grn)':'var(--line)'}"></span>`).join("");
-    openModal(`
-      <div class="mhead"><h3>${s.title}</h3>
-        <button id="tourX" title="Skip tour" style="color:var(--mut);font-size:22px;line-height:1;padding:4px;background:none;border:none;cursor:pointer">×</button></div>
-      <div class="mbody">
-        <p style="font-size:14px;line-height:1.65;color:var(--mut)">${s.body}</p>
-        <div style="display:flex;gap:6px;justify-content:center;margin-top:20px">${dots}</div>
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)">
+        <h3 style="font-size:16px;font-weight:800">${s.title}</h3>
+        <button id="tourX" title="Skip tour" style="color:var(--mut);font-size:22px;line-height:1;padding:4px;background:none;border:none;cursor:pointer">×</button>
       </div>
-      <div class="mfoot" style="justify-content:space-between">
+      <div style="padding:16px 20px">
+        <p style="font-size:14px;line-height:1.65;color:var(--mut)">${s.body}</p>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:18px">${dots}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 20px;border-top:1px solid var(--line)">
         <button class="btn" id="tourSkip">Skip tour</button>
         <div style="display:flex;gap:10px">
           ${i>0?'<button class="btn" id="tourBack">Back</button>':''}
           <button class="btn grn" id="tourNext">${last?"Get started":"Next"}</button>
         </div>
-      </div>`);
+      </div>`;
+    dim.classList.add("on"); card.classList.add("on");
     $("#tourNext").onclick = ()=>{ if(last) finish(); else { i++; render(); } };
     $("#tourSkip").onclick = finish;
     $("#tourX").onclick = finish;
