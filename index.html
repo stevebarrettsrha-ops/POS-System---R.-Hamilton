@@ -151,7 +151,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 .seg button.on{background:var(--grn);color:#07130E}
 
 /* ---------- modal ---------- */
-.overlay{position:fixed;inset:0;background:rgba(6,9,13,.72);display:none;align-items:center;justify-content:center;z-index:80;padding:18px}
+.overlay{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(6,9,13,.72);display:none;align-items:center;justify-content:center;z-index:80;padding:18px}
 .overlay.on{display:flex}
 .modal{background:var(--ink2);border:1px solid var(--line);border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto}
 .modal.wide{max-width:560px}
@@ -221,14 +221,30 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* ---------- guided tour ---------- */
-#tourDim{position:fixed;inset:0;background:rgba(6,9,13,.28);z-index:70;display:none}
+#tourDim{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(6,9,13,.28);z-index:70;display:none}
 #tourDim.on{display:block}
 .tour-spot{position:relative;z-index:74;border-radius:10px;background:var(--ink2)!important;
   box-shadow:0 0 0 2px var(--grn),0 0 0 7px rgba(47,165,123,.28)}
 #tourCard{position:fixed;z-index:75;left:50%;bottom:26px;transform:translateX(-50%);
-  width:min(440px,calc(100vw - 32px));background:var(--ink2);border:1px solid var(--line);
+  width:440px;max-width:calc(100vw - 32px);background:var(--ink2);border:1px solid var(--line);
   border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none}
 #tourCard.on{display:block;animation:popIn .24s cubic-bezier(.25,.9,.35,1.15)}
+
+/* ---------- flexbox gap fallback (older browsers, ~2016–2020) ---------- */
+.no-flex-gap .nav>button+button{margin-top:2px}
+.no-flex-gap .chips>button{margin:0 7px 7px 0}
+.no-flex-gap .staff-pick>button+button{margin-top:8px}
+.no-flex-gap .mfoot>*+*{margin-left:10px}
+.no-flex-gap .pay-methods, .no-flex-gap .quick-cash, .no-flex-gap .stat-row, .no-flex-gap .two-col{} /* grids: gap already OK */
+
+/* ---------- older-browser fallback screen ---------- */
+#compat-fallback{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9999;background:#141A23;color:#E9EDF2;align-items:center;justify-content:center;padding:24px;font-family:'Archivo',system-ui,sans-serif;text-align:center}
+#compat-fallback .cf-box{max-width:460px}
+#compat-fallback .cf-logo{font-weight:800;font-size:23px;margin-bottom:20px;letter-spacing:-.3px}
+#compat-fallback .cf-logo span{color:#2FA57B}
+#compat-fallback h2{font-size:20px;margin-bottom:14px}
+#compat-fallback p{color:#8C97A7;line-height:1.65;margin-bottom:14px;font-size:15px}
+#compat-fallback .cf-note{font-size:13px;color:#6E7A8A}
 
 /* ---------- category dropdown (mobile) ---------- */
 .catselect{display:none;margin-bottom:12px}
@@ -245,7 +261,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 /* ---------- mobile cart bar + bottom sheet ---------- */
 .cart-fab{display:none;position:fixed;left:14px;right:14px;z-index:39;align-items:center;justify-content:space-between;gap:10px;background:var(--grn);color:#07130E;font-weight:800;font-size:15px;padding:14px 18px;border-radius:13px;box-shadow:0 10px 28px rgba(0,0,0,.5);transform:translateY(150%);opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.3,1.1,.4,1),opacity .25s}
 .cart-fab .fab-count{background:#07130E;color:var(--grn);font-family:var(--mono);font-size:12px;font-weight:700;border-radius:99px;padding:2px 9px;margin-right:8px}
-.sheet-backdrop{position:fixed;inset:0;background:rgba(6,9,13,.62);z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
+.sheet-backdrop{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(6,9,13,.62);z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
 .sheet-backdrop.on{opacity:1;pointer-events:auto}
 .sheet-handle{display:none}
 
@@ -521,6 +537,43 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 <div id="tourCard"></div>
 <div id="printArea"></div>
 
+<!-- Fallback shown only when the browser is too old to run the modern app -->
+<div id="compat-fallback">
+  <div class="cf-box">
+    <div class="cf-logo">SB <span>Point of Sale</span></div>
+    <h2>Your browser needs an update</h2>
+    <p>SB Point of Sale uses modern web features that this device's browser doesn't support yet. Any data you've saved is still safe on this device.</p>
+    <p>To run it on this tablet, please update <b>Chrome</b> or <b>Samsung Internet</b> from the Play Store — or open the app in an up-to-date browser.</p>
+    <p class="cf-note">Recommended: Chrome 80+ or Samsung Internet 13+.</p>
+  </div>
+</div>
+<noscript><div style="position:fixed;inset:0;background:#141A23;color:#E9EDF2;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:sans-serif">Please enable JavaScript to use SB Point of Sale.</div></noscript>
+
+<!-- ES5-only capability gate: runs before the modern app; on browsers too old
+     to parse/run it, shows the fallback screen instead of a broken UI. -->
+<script>
+(function(){
+  "use strict";
+  var ok = true;
+  try {
+    // Compile (not run) the core syntax the app needs: arrow + async + const + template literals.
+    // On an old engine this throws SyntaxError, which we catch here in plain ES5.
+    new Function("var f = async function(){ const s = `x`; return (function(a){ return a; })(s); };");
+  } catch (e) { ok = false; }
+  if (ok && (!window.Promise || !window.Map || !window.Set || typeof Object.assign !== "function" || !window.Symbol)) ok = false;
+  if (!ok) {
+    window.__POS_UNSUPPORTED__ = true;
+    var reveal = function(){
+      var app = document.querySelector(".app"); if (app) app.style.display = "none";
+      var nav = document.querySelector(".bottom-nav"); if (nav) nav.style.display = "none";
+      var fb = document.getElementById("compat-fallback"); if (fb) fb.style.display = "flex";
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", reveal);
+    else reveal();
+  }
+})();
+</script>
+
 <script>
 /* =====================================================================
    SB Point of Sale — single-file point of sale
@@ -536,6 +589,19 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 ===================================================================== */
 (function(){
 "use strict";
+if(window.__POS_UNSUPPORTED__) return;   // older-browser fallback screen is showing instead
+
+/* older browsers (pre-flexbox-gap) — switch key rows to margin spacing */
+(function(){
+  try{
+    var t = document.createElement("div");
+    t.style.cssText = "display:flex;flex-direction:column;row-gap:3px;position:absolute;visibility:hidden;height:auto";
+    t.appendChild(document.createElement("i")); t.appendChild(document.createElement("i"));
+    (document.body || document.documentElement).appendChild(t);
+    if(t.scrollHeight < 3) document.documentElement.classList.add("no-flex-gap");
+    t.parentNode.removeChild(t);
+  }catch(e){}
+})();
 
 /* ---------------- state ---------------- */
 const DEFAULTS = {
@@ -725,7 +791,7 @@ async function updateSaveStatus(){
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
-const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = n => db.settings.currency + Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const uid = p => p + Math.random().toString(36).slice(2,9);
 const emp = id => db.employees.find(e=>e.id===id);
@@ -1692,7 +1758,7 @@ $("#exportCsv").addEventListener("click", ()=>{
   db.sales.forEach(s=>s.lines.forEach(l=>rows.push([
     s.id, new Date(s.ts).toISOString(), s.empName, s.method, l.name, l.sku, l.qty, l.price, (l.price*l.qty).toFixed(2), s.sub, s.disc, s.tax, s.total
   ])));
-  const csv = rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const csv = rows.map(r=>r.map(v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
   a.download = "sales-export.csv"; a.click(); URL.revokeObjectURL(a.href);
